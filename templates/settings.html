@@ -974,13 +974,21 @@ renderReminderTemplates(res.templates);
 } catch (error) {
 console.error('Error loading reminder templates:', error);
 }
+try {
+const res = await API.get('/api/reminder-templates');
+if (res.success) {
+renderReminderTemplates(res.templates);
+}
+} catch (error) {
+console.error('Error loading reminder templates:', error);
+}
 }
 
 function formatTiming(minutes) {
 if (!minutes) return '0m';
 if (minutes < 60) return minutes + 'm' ; const h=Math.floor(minutes / 60); const m=minutes % 60; return h + 'h' + (m
     ? ' ' + m + 'm' : '' ); } function renderReminderTemplates(templates) { const
-    container=document.getElementById('reminderTemplatesList');
+    container=document.getElementById('reminderTemplatesList'); if (!container) return; if (templates.length===0) {
     container.innerHTML='<p class="text-muted">No templates yet. Add one to get started.</p>' ; return; }
     container.innerHTML=templates.map(t=> `
     <div class="card p-3 mb-2" style="background: #f8fafc;">
