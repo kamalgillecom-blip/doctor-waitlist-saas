@@ -639,6 +639,131 @@ def api_get_queue_by_status(status):
 # API Routes - Patient Management & Calendar
 # ============================================================================
 
+@app.route('/api/patients', methods=['POST'])
+def api_create_patient():
+    """Create a new patient manually"""
+    try:
+        data = request.json
+        required = ['first_name', 'phone']
+        for field in required:
+            if not data.get(field):
+                return jsonify({'success': False, 'error': f'Field {field} is required'}), 400
+        
+        db = get_db()
+        cursor = db.cursor()
+        
+        # Determine phone type (default Mobile)
+        phone_type = data.get('phone_type', 'Mobile')
+        
+        # Check for duplicates on phone or email
+        cursor.execute("SELECT id FROM patients WHERE phone = ?", (data['phone'],))
+        existing = cursor.fetchone()
+        if existing:
+            return jsonify({'success': False, 'error': 'A patient with this phone number already exists.'}), 409
+            
+        if data.get('email'):
+            cursor.execute("SELECT id FROM patients WHERE email = ?", (data['email'],))
+            existing = cursor.fetchone()
+            if existing:
+                return jsonify({'success': False, 'error': 'A patient with this email already exists.'}), 409
+
+        cursor.execute('''
+            INSERT INTO patients (first_name, last_name, phone, email, phone_type, tags, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data['first_name'], 
+            data.get('last_name', ''), 
+            data['phone'], 
+            data.get('email'), 
+            phone_type,
+            data.get('tags'),
+            'MANUAL'
+        ))
+        
+        new_id = cursor.lastrowid
+        db.commit()
+        db.close()
+        
+        return jsonify({'success': True, 'patient_id': new_id})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/patients/import', methods=['POST'])
+def api_import_patients():
+    """Import patients from CSV"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file part'}), 400
+            
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No select file'}), 400
+            
+        if not file.filename.endswith('.csv'):
+             return jsonify({'success': False, 'error': 'File must be a CSV'}), 400
+
+        # Read file
+        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+        csv_input = csv.DictReader(stream)
+        
+        if not csv_input.fieldnames:
+             return jsonify({'success': False, 'error': 'Empty CSV'}), 400
+             
+        # Normalize headers to lowercase for safer matching
+        headers = [h.lower().strip() for h in csv_input.fieldnames]
+        
+        # Check for required columns
+        if 'first_name' not in headers and 'firstname' not in headers:
+             return jsonify({'success': False, 'error': 'CSV must have "first_name" column'}), 400
+             
+        db = get_db()
+        cursor = db.cursor()
+        
+        stats = {
+            'imported': 0,
+            'skipped': 0,
+            'errors': []
+        }
+        
+        row_num = 1
+        for row in csv_input:
+            row_num += 1
+            # Handle lenient headers
+            processed_row = {k.lower().strip(): v.strip() for k, v in row.items() if k}
+            
+            first_name = processed_row.get('first_name') or processed_row.get('firstname')
+            last_name = processed_row.get('last_name') or processed_row.get('lastname') or ''
+            phone = processed_row.get('phone') or processed_row.get('mobile') or processed_row.get('cell')
+            email = processed_row.get('email')
+            tags = processed_row.get('tags')
+            
+            if not first_name or not phone:
+                 stats['errors'].append(f"Row {row_num}: Missing Name or Phone")
+                 continue
+                 
+            # Check duplicate
+            cursor.execute("SELECT id FROM patients WHERE phone = ?", (phone,))
+            if cursor.fetchone():
+                stats['skipped'] += 1
+                continue
+                
+            try:
+                cursor.execute('''
+                    INSERT INTO patients (first_name, last_name, phone, email, tags, source)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (first_name, last_name, phone, email, tags, 'IMPORT'))
+                stats['imported'] += 1
+            except Exception as e:
+                stats['errors'].append(f"Row {row_num}: DB Error {str(e)}")
+
+        db.commit()
+        db.close()
+        
+        return jsonify({'success': True, 'stats': stats})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/patients/<int:patient_id>', methods=['GET'])
 def api_get_patient_details(patient_id):
     """Get full patient details"""
