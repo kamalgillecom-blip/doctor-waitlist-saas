@@ -3,8 +3,9 @@ Main Flask application
 API routes and page serving
 """
 
-from flask import Flask, request, jsonify, render_template, send_from_directory, redirect
-
+from flask import Flask, request, jsonify, render_template, send_from_directory, redirect, url_for, session, flash
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask_cors import CORS
 from datetime import datetime, timedelta
 import json
@@ -19,6 +20,15 @@ import message_service
 import alert_service
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
+app.secret_key = 'supersecretkey'  # Change this to a random secret key for production
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 app.config.from_object(config)
 CORS(app)
 
@@ -53,6 +63,52 @@ def inject_office_settings():
     except:
         pass
     return dict(office_settings={})
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        conn = get_db()
+        user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
+        conn.close()
+        if user and check_password_hash(user['password_hash'], password):
+            session['user_id'] = user['id']
+            session['user_name'] = user['name']
+            return redirect(url_for('dashboard'))
+        flash('Invalid email or password')
+    return render_template('login.html')
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        name = request.form.get('name')
+        password = request.form.get('password')
+        conn = get_db()
+        try:
+            cursor = conn.cursor()
+            user_exists = cursor.execute('SELECT id FROM users WHERE email = ?', (email,)).fetchone()
+            if user_exists:
+                flash('Email already exists')
+                conn.close()
+                return redirect(url_for('signup'))
+            password_hash = generate_password_hash(password)
+            cursor.execute('INSERT INTO users (email, name, password_hash) VALUES (?, ?, ?)',
+                         (email, name, password_hash))
+            conn.commit()
+            conn.close()
+            flash('Account created! Please log in.')
+            return redirect(url_for('login'))
+        except Exception as e:
+            flash(f'An error occurred: {str(e)}')
+            return redirect(url_for('signup'))
+    return render_template('signup.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
 
 @app.route('/api/queue/<int:entry_id>', methods=['PATCH'])
 def api_update_queue_entry(entry_id):
@@ -1221,6 +1277,7 @@ def index():
     return render_template('landing.html')
 
 @app.route('/dashboard')
+@login_required
 def dashboard():
     """Reception dashboard"""
     return render_template('dashboard.html')
@@ -1236,26 +1293,31 @@ def status(token):
     return render_template('status.html', token=token)
 
 @app.route('/display')
+@login_required
 def display():
     """Public waiting room display"""
     return render_template('display.html')
 
 @app.route('/messages')
+@login_required
 def messages():
     """Messages inbox"""
     return render_template('messages.html')
 
 @app.route('/calendar')
+@login_required
 def calendar():
     """Calendar page"""
     return render_template('calendar.html')
 
 @app.route('/customers')
+@login_required
 def customers():
     """Customers page"""
     return render_template('customers.html')
 
 @app.route('/settings')
+@login_required
 def settings():
     """Settings page"""
     return render_template('settings.html')
