@@ -255,14 +255,7 @@
                     </div>
                 </div>
 
-                <script>
-                    // Add listener to switchSettingsTab to load schedule if tab is 'schedule'
-                    const origSwitch = window.switchSettingsTab;
-                    window.switchSettingsTab = function (tabId) {
-                        origSwitch(tabId);
-                        if (tabId === 'schedule') loadScheduleMatrix();
-                    }
-                </script>
+
 
                 <!-- Region Settings -->
                 <div id="settings-region" class="settings-section">
@@ -549,6 +542,7 @@
         // Lazy Load safely
         if (tabId === 'reminders' && typeof loadReminderTemplates === 'function') loadReminderTemplates();
         if (tabId === 'forms' && typeof loadForms === 'function') loadForms();
+        if (tabId === 'schedule' && typeof loadScheduleMatrix === 'function') loadScheduleMatrix();
     }
 </script>
 <script>
@@ -785,6 +779,757 @@
     </style>
 
     <script>
+        // Doctor Modal Logic
+        function openDoctorModal(doc=null) {
+            if (doc) {
+                document.getElementById('dm-title').textContent = 'Edit Doctor';
+                document.getElementById('dm-id').value = doc.id;
+                document.getElementById('dm-name').value = doc.name;
+                document.getElementById('dm-specialty').value = doc.specialty || '';
+                document.getElementById('dm-email').value = doc.email || '';
+                selectColor(doc.color || '#3b82f6');
+            } else {
+                document.getElementById('dm-title').textContent = 'Add Doctor';
+                document.getElementById('dm-id').value = '';
+                document.getElementById('dm-name').value = '';
+                document.getElementById('dm-specialty').value = '';
+                document.getElementById('dm-email').value = '';
+                selectColor('#3b82f6');
+            }
+            document.getElementById('doctorModal').style.display = 'flex';
+        }
+
+        function closeDoctorModal() {
+            document.getElementById('doctorModal').style.display = 'none';
+        }
+
+        function selectColor(color, el=null) {
+            document.getElementById('dm-color').value = color;
+            document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+            
+            // Find element if not passed
+            if (!el) {
+                el = Array.from(document.querySelectorAll('.color-swatch')).find(s => {
+                    // Normalize color comparison roughly
+                    return s.style.backgroundColor.includes(hexToRgb(color)) || s.getAttribute('onclick').includes(color);
+                });
+            }
+            if (el) el.classList.add('selected');
+        }
+
+        // Helper to match computed style rgb output to hex if needed (simplified here)
+        function hexToRgb(hex) {
+            // Very basic check, mainly relies on finding the right div by onclick attribute in practice
+            return 'rgb'; 
+        }
+
+        async function saveDoctorForm() {
+            const id = document.getElementById('dm-id').value;
+            const data = {
+                name: document.getElementById('dm-name').value,
+                specialty: document.getElementById('dm-specialty').value,
+                email: document.getElementById('dm-email').value,
+                color: document.getElementById('dm-color').value
+            };
+
+            if (!data.name) return alert("Name is required");
+
+            let res;
+            if (id) {
+                res = await API.put(`/api/doctors/${id}`, data);
+            } else {
+                res = await API.post('/api/doctors', data);
+            }
+
+            if (res.success) {
+                closeDoctorModal();
+                loadDoctors();
+                // If schedule tab is open, reload that too
+                if (document.getElementById('settings-schedule').classList.contains('active')) {
+                    loadScheduleMatrix();
+                }
+            } else {
+                alert("Error: " + res.error);
+            }
+        }
+
+        // Replace old edit/add functions to use new modal
+        window.addDoctor = function() { openDoctorModal(); };
+        window.editDoctor = function(id, name, spec, color, email) {
+            openDoctorModal({ id, name, specialty: spec, color, email });
+        };
+
+
+        // Schedule Logic
+        async function loadScheduleMatrix() {
+            const container = document.getElementById('schedule-matrix-container');
+            container.innerHTML = '<p class="text-center text-muted">Loading schedule...</p>';
+            
+            try {
+                const res = await API.get('/api/schedules');
+                if (!res.success) throw new Error(res.error);
+
+                renderScheduleMatrix(res.doctors);
+            } catch (e) {
+                container.innerHTML = `<p class="text-danger">Error loading schedule: ${e.message}</p>`;
+            }
+        }
+
+        function renderScheduleMatrix(doctors) {
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            let html = '<div class="schedule-matrix">';
+            
+            // Header Row
+            html += '<div class="matrix-header">Doctor</div>';
+            days.forEach(d => html += `<div class="matrix-header">${d}</div>`);
+            
+            doctors.forEach(doc => {
+                html += `<div class="matrix-cell matrix-row-header" style="border-left: 4px solid ${doc.color}; padding-left:10px;">
+                    <div>${doc.name}<br><small style="font-weight:normal;color:#666">${doc.specialty||''}</small></div>
+                </div>`;
+                
+                days.forEach((day, idx) => {
+                    // JS day 0 is Sunday, but our DB 0 is Monday usually. Let's standardize:
+                    // Let's assume 0=Mon, 6=Sun in our DB schema comment.
+                    const dayIdx = idx; 
+                    
+                    const sched = (doc.schedule || []).find(s => s.day_of_week === dayIdx) || {};
+                    const isAvail = sched.is_available !== 0 && sched.is_available !== false; // Default true if null? No, default should be false if no record? 
+                    // Actually let's default to false if no record, or true if we want to be nice.
+                    // The DB default is 1, but if no row exists logic is tricky. Let's say if row exists use it.
+                    
+                    const start = sched.start_time || '09:00';
+                    const end = sched.end_time || '17:00';
+                    const checked = (sched.is_available === 1 || sched.is_available === true) ? 'checked' : '';
+                    if (!sched.id) {
+                         // No record implies available? Or not? Let's say not available until set.
+                         // Or maybe default new docs to M-F 9-5?
+                         // Let's leave unchecked if no record.
+                    }
+
+                    html += `<div class="matrix-cell">
+                        <label class="toggle-switch">
+                            <input type="checkbox" ${checked} onchange="updateSchedule(${doc.id}, ${dayIdx}, this.checked, '${start}', '${end}')">
+                            <span class="slider"></span>
+                        </label>
+                        <div style="opacity: ${checked ? 1 : 0.5}; pointer-events: ${checked ? 'auto' : 'none'};">
+                            <input type="time" class="time-input-xs mb-1" value="${start}" onchange="updateSchedule(${doc.id}, ${dayIdx}, true, this.value, this.nextElementSibling.value)">
+                            <input type="time" class="time-input-xs" value="${end}" onchange="updateSchedule(${doc.id}, ${dayIdx}, true, this.previousElementSibling.value, this.value)">
+                        </div>
+                    </div>`;
+                });
+            });
+            
+            html += '</div>';
+            document.getElementById('schedule-matrix-container').innerHTML = html;
+        }
+
+        async function updateSchedule(docId, dayIdx, isAvail, start, end) {
+            // console.log('Updating', docId, dayIdx, isAvail, start, end);
+            try {
+                await API.post('/api/schedules', {
+                    doctor_id: docId,
+                    day_of_week: dayIdx,
+                    is_available: isAvail,
+                    start_time: start,
+                    end_time: end
+                });
+                // Optional: visual feedback toast
+            } catch (e) {
+                console.error(e);
+                alert("Failed to save schedule");
+            }
+        }
+</script>
+<script>
+    // Critical Navigation Logic - Isolated for stability
+    function switchSettingsTab(tabId) {
+        console.log('Switching to tab:', tabId);
+
+        // Update Nav
+        document.querySelectorAll('.settings-nav-item').forEach(el => {
+            el.classList.remove('active');
+            const attr = el.getAttribute('onclick');
+            if (attr && attr.includes("'" + tabId + "'")) {
+                el.classList.add('active');
+            }
+        });
+
+        // Update Sections
+        document.querySelectorAll('.settings-section').forEach(el => el.classList.remove('active'));
+        const sec = document.getElementById('settings-' + tabId);
+        if (sec) {
+            sec.classList.add('active');
+        } else {
+            console.error('Target section not found:', 'settings-' + tabId);
+        }
+
+        // Lazy Load safely
+        if (tabId === 'reminders' && typeof loadReminderTemplates === 'function') loadReminderTemplates();
+        if (tabId === 'forms' && typeof loadForms === 'function') loadForms();
+        if (tabId === 'schedule' && typeof loadScheduleMatrix === 'function') loadScheduleMatrix();
+    }
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        loadSettings();
+        loadDoctors();
+    });
+
+    async function loadSettings() {
+        const res = await API.get('/api/settings');
+        if (res.success) {
+            if (res.location) {
+                document.getElementById('officeName').value = res.location.name || '';
+                document.getElementById('officeAddress').value = res.location.address || '';
+                document.getElementById('officePhone').value = res.location.phone || '';
+                if (document.getElementById('officeSmsName')) document.getElementById('officeSmsName').value = res.location.sms_from_name || '';
+            }
+            if (res.display && res.display.theme_colors) {
+                const colors = res.display.theme_colors;
+                document.getElementById('themePrimary').value = colors.primary || '#3b82f6';
+                document.getElementById('themePrimaryText').value = colors.primary || '#3b82f6';
+                document.getElementById('themeSecondary').value = colors.secondary || '#10b981';
+                document.getElementById('themeSecondaryText').value = colors.secondary || '#10b981';
+                document.getElementById('themeAccent').value = colors.accent || '#f59e0b';
+                document.getElementById('themeAccentText').value = colors.accent || '#f59e0b';
+
+                // Apply colors to CSS variables
+                document.documentElement.style.setProperty('--color-primary', colors.primary);
+                document.documentElement.style.setProperty('--color-success', colors.secondary); // Assuming secondary maps to success
+                document.documentElement.style.setProperty('--color-warning', colors.accent); // Assuming accent maps to warning
+            }
+        }
+    }
+
+    async function loadDoctors() {
+        const res = await API.get('/api/doctors');
+        if (res.success) {
+            const list = document.getElementById('doctorsList');
+            if (res.doctors.length === 0) {
+                list.innerHTML = '<p class="text-muted">No doctors found.</p>';
+                return;
+            }
+            list.innerHTML = res.doctors.map(d => `
+                <div class="card p-3 mb-2" style="border-left: 5px solid ${d.color || '#ccc'}">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <strong>${d.name}</strong> <small class="text-muted">(${d.specialty || 'General'})</small>
+                            <br><small class="text-muted" style="font-size:0.8em">${d.email || ''}</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline" onclick="editDoctor(${d.id}, '${d.name}', '${d.specialty || ''}', '${d.color || ''}', '${d.email || ''}')">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteDoctor(${d.id})">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+
+
+
+    async function saveSettings(section) {
+        let payload = { section: section };
+
+        if (section === 'location') {
+            payload.office_name = document.getElementById('officeName').value;
+            payload.address = document.getElementById('officeAddress').value;
+            payload.phone = document.getElementById('officePhone').value;
+            payload.sms_from_name = document.getElementById('officeSmsName').value;
+        } else if (section === 'display') {
+            payload.theme_colors = {
+                primary: document.getElementById('themePrimary').value,
+                secondary: document.getElementById('themeSecondary').value,
+                accent: document.getElementById('themeAccent').value
+            };
+
+            // Also update local CSS vars immediately for preview
+            document.documentElement.style.setProperty('--color-primary', payload.theme_colors.primary);
+            document.documentElement.style.setProperty('--color-success', payload.theme_colors.secondary);
+            document.documentElement.style.setProperty('--color-warning', payload.theme_colors.accent);
+            // Need to update variants too? For proper theme, yes, but for MVP just base colors.
+        }
+
+        const res = await API.put('/api/settings', payload);
+        if (res.success) alert('Settings saved!');
+        else alert('Error saving settings');
+    }
+
+    async function deleteDoctor(id) {
+        if (!confirm('Are you sure you want to remove this doctor?')) return;
+
+        const res = await API.delete(`/api/doctors/${id}`);
+        if (res.success) {
+            loadDoctors();
+        } else {
+            alert('Error deleting doctor: ' + res.error);
+        }
+    }
+
+
+    <!-- Doctor Modal (Replaces Prompts) -->
+    <div id="doctorModal" class="modal-overlay" style="display:none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="dm-title">Add Doctor</h3>
+                <button class="close-modal" onclick="closeDoctorModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="dm-id">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="dm-name" class="form-control" placeholder="Dr. Jane Doe">
+                </div>
+                <div class="form-group">
+                    <label>Specialty</label>
+                    <input type="text" id="dm-specialty" class="form-control" placeholder="General Practice">
+                </div>
+                <div class="form-group">
+                    <label>Email (Optional)</label>
+                    <input type="email" id="dm-email" class="form-control" placeholder="dr.jane@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Color Tag</label>
+                    <div class="color-swatches">
+                        <div class="color-swatch" style="background:#3b82f6;" onclick="selectColor('#3b82f6', this)"></div>
+                        <div class="color-swatch" style="background:#10b981;" onclick="selectColor('#10b981', this)"></div>
+                        <div class="color-swatch" style="background:#f59e0b;" onclick="selectColor('#f59e0b', this)"></div>
+                        <div class="color-swatch" style="background:#ef4444;" onclick="selectColor('#ef4444', this)"></div>
+                        <div class="color-swatch" style="background:#8b5cf6;" onclick="selectColor('#8b5cf6', this)"></div>
+                        <div class="color-swatch" style="background:#ec4899;" onclick="selectColor('#ec4899', this)"></div>
+                        <div class="color-swatch" style="background:#64748b;" onclick="selectColor('#64748b', this)"></div>
+                        <div class="color-swatch" style="background:#06b6d4;" onclick="selectColor('#06b6d4', this)"></div>
+                    </div>
+                    <input type="hidden" id="dm-color" value="#3b82f6">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeDoctorModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveDoctorForm()">Save Doctor</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .color-swatches {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        .color-swatch {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: transform 0.2s;
+        }
+        .color-swatch:hover {
+            transform: scale(1.1);
+        }
+        .color-swatch.selected {
+            border-color: #1f2937;
+            transform: scale(1.1);
+            box-shadow: 0 0 0 2px white, 0 0 0 4px #1f2937;
+        }
+
+        /* Schedule Matrix */
+        .schedule-matrix {
+            display: grid;
+            grid-template-columns: 150px repeat(7, 1fr);
+            gap: 1px;
+            background: #e5e7eb;
+            border: 1px solid #e5e7eb;
+            overflow-x: auto;
+        }
+        .matrix-header, .matrix-cell {
+            background: white;
+            padding: 10px;
+            font-size: 0.9em;
+        }
+        .matrix-header {
+            font-weight: 600;
+            background: #f9fafb;
+            text-align: center;
+        }
+        .matrix-row-header {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+        .matrix-cell {
+            min-width: 100px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            align-items: center;
+            justify-content: center;
+        }
+        .time-input-xs {
+            width: 100%;
+            padding: 2px;
+            font-size: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 34px;
+            height: 20px;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #10b981; }
+        input:checked + .slider:before { transform: translateX(14px); }
+    </style>
+
+    <script>
+        // Doctor Modal Logic
+        function openDoctorModal(doc=null) {
+            if (doc) {
+                document.getElementById('dm-title').textContent = 'Edit Doctor';
+                document.getElementById('dm-id').value = doc.id;
+                document.getElementById('dm-name').value = doc.name;
+                document.getElementById('dm-specialty').value = doc.specialty || '';
+                document.getElementById('dm-email').value = doc.email || '';
+                selectColor(doc.color || '#3b82f6');
+            } else {
+                document.getElementById('dm-title').textContent = 'Add Doctor';
+                document.getElementById('dm-id').value = '';
+                document.getElementById('dm-name').value = '';
+                document.getElementById('dm-specialty').value = '';
+                document.getElementById('dm-email').value = '';
+                selectColor('#3b82f6');
+            }
+            document.getElementById('doctorModal').style.display = 'flex';
+        }
+
+        function closeDoctorModal() {
+            document.getElementById('doctorModal').style.display = 'none';
+        }
+
+        function selectColor(color, el=null) {
+            document.getElementById('dm-color').value = color;
+            document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+            
+            // Find element if not passed
+            if (!el) {
+                el = Array.from(document.querySelectorAll('.color-swatch')).find(s => {
+                    // Normalize color comparison roughly
+                    return s.style.backgroundColor.includes(hexToRgb(color)) || s.getAttribute('onclick').includes(color);
+                });
+            }
+            if (el) el.classList.add('selected');
+        }
+
+        // Helper to match computed style rgb output to hex if needed (simplified here)
+        function hexToRgb(hex) {
+            // Very basic check, mainly relies on finding the right div by onclick attribute in practice
+            return 'rgb'; 
+        }
+
+        async function saveDoctorForm() {
+            const id = document.getElementById('dm-id').value;
+            const data = {
+                name: document.getElementById('dm-name').value,
+                specialty: document.getElementById('dm-specialty').value,
+                email: document.getElementById('dm-email').value,
+                color: document.getElementById('dm-color').value
+            };
+
+            if (!data.name) return alert("Name is required");
+
+            let res;
+            if (id) {
+                res = await API.put(`/api/doctors/${id}`, data);
+            } else {
+                res = await API.post('/api/doctors', data);
+            }
+
+            if (res.success) {
+                closeDoctorModal();
+                loadDoctors();
+                // If schedule tab is open, reload that too
+                if (document.getElementById('settings-schedule').classList.contains('active')) {
+                    loadScheduleMatrix();
+                }
+            } else {
+                alert("Error: " + res.error);
+            }
+        }
+
+        // Replace old edit/add functions to use new modal
+        window.addDoctor = function() { openDoctorModal(); };
+        window.editDoctor = function(id, name, spec, color, email) {
+            openDoctorModal({ id, name, specialty: spec, color, email });
+        };
+
+
+        // Schedule Logic
+        async function loadScheduleMatrix() {
+            const container = document.getElementById('schedule-matrix-container');
+            container.innerHTML = '<p class="text-center text-muted">Loading schedule...</p>';
+            
+            try {
+                const res = await API.get('/api/schedules');
+                if (!res.success) throw new Error(res.error);
+
+                renderScheduleMatrix(res.doctors);
+            } catch (e) {
+                container.innerHTML = `<p class="text-danger">Error loading schedule: ${e.message}</p>`;
+            }
+        }
+
+        function renderScheduleMatrix(doctors) {
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            let html = '<div class="schedule-matrix">';
+            
+            // Header Row
+            html += '<div class="matrix-header">Doctor</div>';
+            days.forEach(d => html += `<div class="matrix-header">${d}</div>`);
+            
+            doctors.forEach(doc => {
+                html += `<div class="matrix-cell matrix-row-header" style="border-left: 4px solid ${doc.color}; padding-left:10px;">
+                    <div>${doc.name}<br><small style="font-weight:normal;color:#666">${doc.specialty||''}</small></div>
+                </div>`;
+                
+                days.forEach((day, idx) => {
+                    // JS day 0 is Sunday, but our DB 0 is Monday usually. Let's standardize:
+                    // Let's assume 0=Mon, 6=Sun in our DB schema comment.
+                    const dayIdx = idx; 
+                    
+                    const sched = (doc.schedule || []).find(s => s.day_of_week === dayIdx) || {};
+                    const isAvail = sched.is_available !== 0 && sched.is_available !== false; // Default true if null? No, default should be false if no record? 
+                    // Actually let's default to false if no record, or true if we want to be nice.
+                    // The DB default is 1, but if no row exists logic is tricky. Let's say if row exists use it.
+                    
+                    const start = sched.start_time || '09:00';
+                    const end = sched.end_time || '17:00';
+                    const checked = (sched.is_available === 1 || sched.is_available === true) ? 'checked' : '';
+                    if (!sched.id) {
+                         // No record implies available? Or not? Let's say not available until set.
+                         // Or maybe default new docs to M-F 9-5?
+                         // Let's leave unchecked if no record.
+                    }
+
+                    html += `<div class="matrix-cell">
+                        <label class="toggle-switch">
+                            <input type="checkbox" ${checked} onchange="updateSchedule(${doc.id}, ${dayIdx}, this.checked, '${start}', '${end}')">
+                            <span class="slider"></span>
+                        </label>
+                        <div style="opacity: ${checked ? 1 : 0.5}; pointer-events: ${checked ? 'auto' : 'none'};">
+                            <input type="time" class="time-input-xs mb-1" value="${start}" onchange="updateSchedule(${doc.id}, ${dayIdx}, true, this.value, this.nextElementSibling.value)">
+                            <input type="time" class="time-input-xs" value="${end}" onchange="updateSchedule(${doc.id}, ${dayIdx}, true, this.previousElementSibling.value, this.value)">
+                        </div>
+                    </div>`;
+                });
+            });
+            
+            html += '</div>';
+            document.getElementById('schedule-matrix-container').innerHTML = html;
+        }
+
+        async function updateSchedule(docId, dayIdx, isAvail, start, end) {
+            // console.log('Updating', docId, dayIdx, isAvail, start, end);
+            try {
+                await API.post('/api/schedules', {
+                    doctor_id: docId,
+                    day_of_week: dayIdx,
+                    is_available: isAvail,
+                    start_time: start,
+                    end_time: end
+                });
+                // Optional: visual feedback toast
+            } catch (e) {
+                console.error(e);
+                alert("Failed to save schedule");
+            }
+        }
+</script>
+
+
+<!-- Doctor Modal (Replaces Prompts) -->
+<div id="doctorModal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="dm-title">Add Doctor</h3>
+            <button class="close-modal" onclick="closeDoctorModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="dm-id">
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" id="dm-name" class="form-control" placeholder="Dr. Jane Doe">
+            </div>
+            <div class="form-group">
+                <label>Specialty</label>
+                <input type="text" id="dm-specialty" class="form-control" placeholder="General Practice">
+            </div>
+            <div class="form-group">
+                <label>Email (Optional)</label>
+                <input type="email" id="dm-email" class="form-control" placeholder="dr.jane@example.com">
+            </div>
+            <div class="form-group">
+                <label>Color Tag</label>
+                <div class="color-swatches">
+                    <div class="color-swatch" style="background:#3b82f6;" onclick="selectColor('#3b82f6', this)"></div>
+                    <div class="color-swatch" style="background:#10b981;" onclick="selectColor('#10b981', this)"></div>
+                    <div class="color-swatch" style="background:#f59e0b;" onclick="selectColor('#f59e0b', this)"></div>
+                    <div class="color-swatch" style="background:#ef4444;" onclick="selectColor('#ef4444', this)"></div>
+                    <div class="color-swatch" style="background:#8b5cf6;" onclick="selectColor('#8b5cf6', this)"></div>
+                    <div class="color-swatch" style="background:#ec4899;" onclick="selectColor('#ec4899', this)"></div>
+                    <div class="color-swatch" style="background:#64748b;" onclick="selectColor('#64748b', this)"></div>
+                    <div class="color-swatch" style="background:#06b6d4;" onclick="selectColor('#06b6d4', this)"></div>
+                </div>
+                <input type="hidden" id="dm-color" value="#3b82f6">
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeDoctorModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveDoctorForm()">Save Doctor</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .color-swatches {
+        display: flex;
+        gap: 10px;
+        margin-top: 5px;
+    }
+
+    .color-swatch {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: transform 0.2s;
+    }
+
+    .color-swatch:hover {
+        transform: scale(1.1);
+    }
+
+    .color-swatch.selected {
+        border-color: #1f2937;
+        transform: scale(1.1);
+        box-shadow: 0 0 0 2px white, 0 0 0 4px #1f2937;
+    }
+
+    /* Schedule Matrix */
+    .schedule-matrix {
+        display: grid;
+        grid-template-columns: 150px repeat(7, 1fr);
+        gap: 1px;
+        background: #e5e7eb;
+        border: 1px solid #e5e7eb;
+        overflow-x: auto;
+    }
+
+    .matrix-header,
+    .matrix-cell {
+        background: white;
+        padding: 10px;
+        font-size: 0.9em;
+    }
+
+    .matrix-header {
+        font-weight: 600;
+        background: #f9fafb;
+        text-align: center;
+    }
+
+    .matrix-row-header {
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+    }
+
+    .matrix-cell {
+        min-width: 100px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .time-input-xs {
+        width: 100%;
+        padding: 2px;
+        font-size: 0.8rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 34px;
+        height: 20px;
+    }
+
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 34px;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 14px;
+        width: 14px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+
+    input:checked+.slider {
+        background-color: #10b981;
+    }
+
+    input:checked+.slider:before {
+        transform: translateX(14px);
+    }
+</style>
+
+<script>
         // Doctor Modal Logic
         function openDoctorModal(doc=null) {
             if (doc) {
