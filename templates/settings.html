@@ -250,10 +250,19 @@
                         <h2>Schedule</h2>
                         <p class="text-muted">Set weekly hours for each provider.</p>
                     </div>
-                    <div class="card p-4 text-center text-muted">
-                        Scheduler Component Coming Soon
+                    <div id="schedule-matrix-container">
+                        <!-- Populated by JS -->
                     </div>
                 </div>
+
+                <script>
+                    // Add listener to switchSettingsTab to load schedule if tab is 'schedule'
+                    const origSwitch = window.switchSettingsTab;
+                    window.switchSettingsTab = function (tabId) {
+                        origSwitch(tabId);
+                        if (tabId === 'schedule') loadScheduleMatrix();
+                    }
+                </script>
 
                 <!-- Region Settings -->
                 <div id="settings-region" class="settings-section">
@@ -639,244 +648,516 @@
         }
     }
 
-    async function editDoctor(id, currentName, currentSpec, currentColor, currentEmail) {
-        // Simple prompt-based editing matching the Add flow
-        const name = prompt("Edit Name:", currentName);
-        if (name === null) return; // Cancelled
 
-        const specialty = prompt("Edit Specialty:", currentSpec);
-        const color = prompt("Edit Color:", currentColor);
-        const email = prompt("Edit Email:", currentEmail);
-
-        const res = await API.put(`/api/doctors/${id}`, {
-            name: name,
-            specialty: specialty,
-            color: color,
-            email: email
-        });
-
-        if (res.success) {
-            loadDoctors();
-        } else {
-            alert('Error updating doctor: ' + res.error);
-        }
-    }
-
-    async function addDoctor() {
-        const name = prompt("Enter Doctor Name:");
-        if (!name) return;
-        const specialty = prompt("Enter Specialty (e.g. Cardiologist):");
-        const color = prompt("Enter Color Hex (e.g. #FF0000):") || '#3b82f6';
-        const email = prompt("Enter Email (optional):");
-
-        const res = await API.post('/api/doctors', { name, specialty, color, email });
-        if (res.success) {
-            loadDoctors();
-        } else {
-            alert('Error adding doctor: ' + res.error);
-        }
-    }
-
-    // Extend API helper to support DELETE
-    // (Assuming API helper in base.html doesn't have delete, let's just use fetch here or hope it does)
-    // Actually base.html API helper only has get, post, patch, put. Need to add delete or just use fetch.
-    // Let's patch base.html or just add it here locally if base isn't easily accessible? 
-    // Wait, I can see base.html has get, post, patch, put. I missed delete in recent view or it wasn't there.
-    // I can modify base.html or just add it to the local API object enhancement if possible.
-    // Actually, I'll just use raw fetch for delete to avoid another base.html edit cycle unless critical.
-    if (!API.delete) {
-        API.delete = async (url) => {
-            const response = await fetch(url, { method: 'DELETE' });
-            return response.json();
-        };
-    }
-
-    // Reminder Templates Management
-    async function loadReminderTemplates() {
-        try {
-            const res = await API.get('/api/reminder-templates');
-            if (res.success) {
-                renderReminderTemplates(res.templates);
-            }
-        } catch (error) {
-            console.error('Error loading reminder templates:', error);
-        }
-    }
-
-    function formatTiming(minutes) {
-        if (!minutes) return '0m';
-        if (minutes < 60) return minutes + 'm';
-        const h = Math.floor(minutes / 60);
-        const m = minutes % 60;
-        return h + 'h' + (m ? ' ' + m + 'm' : '');
-    }
-
-    function renderReminderTemplates(templates) {
-        const container = document.getElementById('reminderTemplatesList');
-        if (!container) return;
-
-        if (templates.length === 0) {
-            container.innerHTML = '<p class="text-muted">No templates yet. Add one to get started.</p>';
-            return;
-        }
-
-        container.innerHTML = templates.map(t => `
-            <div class="card p-3 mb-2" style="background: #f8fafc;">
-                <div style="display:flex; justify-content:space-between; align-items:start;">
-                    <div>
-                        <strong>${t.name}</strong>
-                        <span class="badge" style="background:#e2e8f0; color:#64748b; margin-left:8px;">${formatTiming(t.timing_minutes)}</span>
-                        ${t.resend_interval_minutes ? `<span class="badge" style="background:#fee2e2; color:#b91c1c; margin-left:4px;">Resend: ${formatTiming(t.resend_interval_minutes)}</span>` : ''}
-                        <p style="margin:8px 0 0; font-size:0.9em; color:#64748b; max-width:500px;">${t.message_template}</p>
+    <!-- Doctor Modal (Replaces Prompts) -->
+    <div id="doctorModal" class="modal-overlay" style="display:none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="dm-title">Add Doctor</h3>
+                <button class="close-modal" onclick="closeDoctorModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="dm-id">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="dm-name" class="form-control" placeholder="Dr. Jane Doe">
+                </div>
+                <div class="form-group">
+                    <label>Specialty</label>
+                    <input type="text" id="dm-specialty" class="form-control" placeholder="General Practice">
+                </div>
+                <div class="form-group">
+                    <label>Email (Optional)</label>
+                    <input type="email" id="dm-email" class="form-control" placeholder="dr.jane@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Color Tag</label>
+                    <div class="color-swatches">
+                        <div class="color-swatch" style="background:#3b82f6;" onclick="selectColor('#3b82f6', this)"></div>
+                        <div class="color-swatch" style="background:#10b981;" onclick="selectColor('#10b981', this)"></div>
+                        <div class="color-swatch" style="background:#f59e0b;" onclick="selectColor('#f59e0b', this)"></div>
+                        <div class="color-swatch" style="background:#ef4444;" onclick="selectColor('#ef4444', this)"></div>
+                        <div class="color-swatch" style="background:#8b5cf6;" onclick="selectColor('#8b5cf6', this)"></div>
+                        <div class="color-swatch" style="background:#ec4899;" onclick="selectColor('#ec4899', this)"></div>
+                        <div class="color-swatch" style="background:#64748b;" onclick="selectColor('#64748b', this)"></div>
+                        <div class="color-swatch" style="background:#06b6d4;" onclick="selectColor('#06b6d4', this)"></div>
                     </div>
-                    <div style="display:flex; gap:6px;">
-                         <button class="btn btn-sm btn-outline" onclick='openReminderTemplateModal(${JSON.stringify(t).replace(/'/g, "&#39;")})'>Edit</button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteReminderTemplate(${t.id})">Delete</button>
-                    </div>
+                    <input type="hidden" id="dm-color" value="#3b82f6">
                 </div>
             </div>
-        `).join('');
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeDoctorModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveDoctorForm()">Save Doctor</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .color-swatches {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        .color-swatch {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: transform 0.2s;
+        }
+        .color-swatch:hover {
+            transform: scale(1.1);
+        }
+        .color-swatch.selected {
+            border-color: #1f2937;
+            transform: scale(1.1);
+            box-shadow: 0 0 0 2px white, 0 0 0 4px #1f2937;
+        }
+
+        /* Schedule Matrix */
+        .schedule-matrix {
+            display: grid;
+            grid-template-columns: 150px repeat(7, 1fr);
+            gap: 1px;
+            background: #e5e7eb;
+            border: 1px solid #e5e7eb;
+            overflow-x: auto;
+        }
+        .matrix-header, .matrix-cell {
+            background: white;
+            padding: 10px;
+            font-size: 0.9em;
+        }
+        .matrix-header {
+            font-weight: 600;
+            background: #f9fafb;
+            text-align: center;
+        }
+        .matrix-row-header {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+        .matrix-cell {
+            min-width: 100px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            align-items: center;
+            justify-content: center;
+        }
+        .time-input-xs {
+            width: 100%;
+            padding: 2px;
+            font-size: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 34px;
+            height: 20px;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #10b981; }
+        input:checked + .slider:before { transform: translateX(14px); }
+    </style>
+
+    <script>
+        // Doctor Modal Logic
+        function openDoctorModal(doc=null) {
+            if (doc) {
+                document.getElementById('dm-title').textContent = 'Edit Doctor';
+                document.getElementById('dm-id').value = doc.id;
+                document.getElementById('dm-name').value = doc.name;
+                document.getElementById('dm-specialty').value = doc.specialty || '';
+                document.getElementById('dm-email').value = doc.email || '';
+                selectColor(doc.color || '#3b82f6');
+            } else {
+                document.getElementById('dm-title').textContent = 'Add Doctor';
+                document.getElementById('dm-id').value = '';
+                document.getElementById('dm-name').value = '';
+                document.getElementById('dm-specialty').value = '';
+                document.getElementById('dm-email').value = '';
+                selectColor('#3b82f6');
+            }
+            document.getElementById('doctorModal').style.display = 'flex';
+        }
+
+        function closeDoctorModal() {
+            document.getElementById('doctorModal').style.display = 'none';
+        }
+
+        function selectColor(color, el=null) {
+            document.getElementById('dm-color').value = color;
+            document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+            
+            // Find element if not passed
+            if (!el) {
+                el = Array.from(document.querySelectorAll('.color-swatch')).find(s => {
+                    // Normalize color comparison roughly
+                    return s.style.backgroundColor.includes(hexToRgb(color)) || s.getAttribute('onclick').includes(color);
+                });
+            }
+            if (el) el.classList.add('selected');
+        }
+
+        // Helper to match computed style rgb output to hex if needed (simplified here)
+        function hexToRgb(hex) {
+            // Very basic check, mainly relies on finding the right div by onclick attribute in practice
+            return 'rgb'; 
+        }
+
+        async function saveDoctorForm() {
+            const id = document.getElementById('dm-id').value;
+            const data = {
+                name: document.getElementById('dm-name').value,
+                specialty: document.getElementById('dm-specialty').value,
+                email: document.getElementById('dm-email').value,
+                color: document.getElementById('dm-color').value
+            };
+
+            if (!data.name) return alert("Name is required");
+
+            let res;
+            if (id) {
+                res = await API.put(`/api/doctors/${id}`, data);
+            } else {
+                res = await API.post('/api/doctors', data);
+            }
+
+            if (res.success) {
+                closeDoctorModal();
+                loadDoctors();
+                // If schedule tab is open, reload that too
+                if (document.getElementById('settings-schedule').classList.contains('active')) {
+                    loadScheduleMatrix();
+                }
+            } else {
+                alert("Error: " + res.error);
+            }
+        }
+
+        // Replace old edit/add functions to use new modal
+        window.addDoctor = function() { openDoctorModal(); };
+        window.editDoctor = function(id, name, spec, color, email) {
+            openDoctorModal({ id, name, specialty: spec, color, email });
+        };
+
+
+        // Schedule Logic
+        async function loadScheduleMatrix() {
+            const container = document.getElementById('schedule-matrix-container');
+            container.innerHTML = '<p class="text-center text-muted">Loading schedule...</p>';
+            
+            try {
+                const res = await API.get('/api/schedules');
+                if (!res.success) throw new Error(res.error);
+
+                renderScheduleMatrix(res.doctors);
+            } catch (e) {
+                container.innerHTML = `<p class="text-danger">Error loading schedule: ${e.message}</p>`;
+            }
+        }
+
+        function renderScheduleMatrix(doctors) {
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            let html = '<div class="schedule-matrix">';
+            
+            // Header Row
+            html += '<div class="matrix-header">Doctor</div>';
+            days.forEach(d => html += `<div class="matrix-header">${d}</div>`);
+            
+            doctors.forEach(doc => {
+                html += `<div class="matrix-cell matrix-row-header" style="border-left: 4px solid ${doc.color}; padding-left:10px;">
+                    <div>${doc.name}<br><small style="font-weight:normal;color:#666">${doc.specialty||''}</small></div>
+                </div>`;
+                
+                days.forEach((day, idx) => {
+                    // JS day 0 is Sunday, but our DB 0 is Monday usually. Let's standardize:
+                    // Let's assume 0=Mon, 6=Sun in our DB schema comment.
+                    const dayIdx = idx; 
+                    
+                    const sched = (doc.schedule || []).find(s => s.day_of_week === dayIdx) || {};
+                    const isAvail = sched.is_available !== 0 && sched.is_available !== false; // Default true if null? No, default should be false if no record? 
+                    // Actually let's default to false if no record, or true if we want to be nice.
+                    // The DB default is 1, but if no row exists logic is tricky. Let's say if row exists use it.
+                    
+                    const start = sched.start_time || '09:00';
+                    const end = sched.end_time || '17:00';
+                    const checked = (sched.is_available === 1 || sched.is_available === true) ? 'checked' : '';
+                    if (!sched.id) {
+                         // No record implies available? Or not? Let's say not available until set.
+                         // Or maybe default new docs to M-F 9-5?
+                         // Let's leave unchecked if no record.
+                    }
+
+                    html += `<div class="matrix-cell">
+                        <label class="toggle-switch">
+                            <input type="checkbox" ${checked} onchange="updateSchedule(${doc.id}, ${dayIdx}, this.checked, '${start}', '${end}')">
+                            <span class="slider"></span>
+                        </label>
+                        <div style="opacity: ${checked ? 1 : 0.5}; pointer-events: ${checked ? 'auto' : 'none'};">
+                            <input type="time" class="time-input-xs mb-1" value="${start}" onchange="updateSchedule(${doc.id}, ${dayIdx}, true, this.value, this.nextElementSibling.value)">
+                            <input type="time" class="time-input-xs" value="${end}" onchange="updateSchedule(${doc.id}, ${dayIdx}, true, this.previousElementSibling.value, this.value)">
+                        </div>
+                    </div>`;
+                });
+            });
+            
+            html += '</div>';
+            document.getElementById('schedule-matrix-container').innerHTML = html;
+        }
+
+        async function updateSchedule(docId, dayIdx, isAvail, start, end) {
+            // console.log('Updating', docId, dayIdx, isAvail, start, end);
+            try {
+                await API.post('/api/schedules', {
+                    doctor_id: docId,
+                    day_of_week: dayIdx,
+                    is_available: isAvail,
+                    start_time: start,
+                    end_time: end
+                });
+                // Optional: visual feedback toast
+            } catch (e) {
+                console.error(e);
+                alert("Failed to save schedule");
+            }
+        }
+</script>
+
+async function addDoctor() {
+const name = prompt("Enter Doctor Name:");
+if (!name) return;
+const specialty = prompt("Enter Specialty (e.g. Cardiologist):");
+const color = prompt("Enter Color Hex (e.g. #FF0000):") || '#3b82f6';
+const email = prompt("Enter Email (optional):");
+
+const res = await API.post('/api/doctors', { name, specialty, color, email });
+if (res.success) {
+loadDoctors();
+} else {
+alert('Error adding doctor: ' + res.error);
+}
+}
+
+// Extend API helper to support DELETE
+// (Assuming API helper in base.html doesn't have delete, let's just use fetch here or hope it does)
+// Actually base.html API helper only has get, post, patch, put. Need to add delete or just use fetch.
+// Let's patch base.html or just add it here locally if base isn't easily accessible?
+// Wait, I can see base.html has get, post, patch, put. I missed delete in recent view or it wasn't there.
+// I can modify base.html or just add it to the local API object enhancement if possible.
+// Actually, I'll just use raw fetch for delete to avoid another base.html edit cycle unless critical.
+if (!API.delete) {
+API.delete = async (url) => {
+const response = await fetch(url, { method: 'DELETE' });
+return response.json();
+};
+}
+
+// Reminder Templates Management
+async function loadReminderTemplates() {
+try {
+const res = await API.get('/api/reminder-templates');
+if (res.success) {
+renderReminderTemplates(res.templates);
+}
+} catch (error) {
+console.error('Error loading reminder templates:', error);
+}
+}
+
+function formatTiming(minutes) {
+if (!minutes) return '0m';
+if (minutes < 60) return minutes + 'm' ; const h=Math.floor(minutes / 60); const m=minutes % 60; return h + 'h' + (m
+    ? ' ' + m + 'm' : '' ); } function renderReminderTemplates(templates) { const
+    container=document.getElementById('reminderTemplatesList'); if (!container) return; if (templates.length===0) {
+    container.innerHTML='<p class="text-muted">No templates yet. Add one to get started.</p>' ; return; }
+    container.innerHTML=templates.map(t=> `
+    <div class="card p-3 mb-2" style="background: #f8fafc;">
+        <div style="display:flex; justify-content:space-between; align-items:start;">
+            <div>
+                <strong>${t.name}</strong>
+                <span class="badge"
+                    style="background:#e2e8f0; color:#64748b; margin-left:8px;">${formatTiming(t.timing_minutes)}</span>
+                ${t.resend_interval_minutes ? `<span class="badge"
+                    style="background:#fee2e2; color:#b91c1c; margin-left:4px;">Resend:
+                    ${formatTiming(t.resend_interval_minutes)}</span>` : ''}
+                <p style="margin:8px 0 0; font-size:0.9em; color:#64748b; max-width:500px;">${t.message_template}</p>
+            </div>
+            <div style="display:flex; gap:6px;">
+                <button class="btn btn-sm btn-outline" onclick='openReminderTemplateModal(${JSON.stringify(t).replace(/'
+                    /g, "&#39;" )})'>Edit</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteReminderTemplate(${t.id})">Delete</button>
+            </div>
+        </div>
+    </div>
+    `).join('');
     }
 
     // Global forms cache for dropdown
     let availableForms = [];
 
     async function refreshFormsCache() {
-        try {
-            const res = await API.get('/api/forms');
-            if (res.success) availableForms = res.forms;
-        } catch (e) { console.error(e); }
+    try {
+    const res = await API.get('/api/forms');
+    if (res.success) availableForms = res.forms;
+    } catch (e) { console.error(e); }
     }
 
     async function openReminderTemplateModal(template = null) {
-        await refreshFormsCache();
+    await refreshFormsCache();
 
-        // Populate Select
-        const select = document.getElementById('rt-form');
-        select.innerHTML = '<option value="">-- No Form Attached --</option>' +
-            availableForms.map(f => `<option value="${f.id}">${f.title}</option>`).join('');
+    // Populate Select
+    const select = document.getElementById('rt-form');
+    select.innerHTML = '<option value="">-- No Form Attached --</option>' +
+    availableForms.map(f => `<option value="${f.id}">${f.title}</option>`).join('');
 
-        if (template) {
-            document.getElementById('rt-modal-title').innerText = 'Edit Reminder Template';
-            document.getElementById('rt-id').value = template.id;
-            document.getElementById('rt-name').value = template.name;
-            document.getElementById('rt-timing').value = template.timing_minutes || (template.timing_hours * 60) || 1440;
-            document.getElementById('rt-resend').value = template.resend_interval_minutes || '';
-            document.getElementById('rt-message').value = template.message_template;
-            document.getElementById('rt-form').value = template.form_id || '';
-        } else {
-            document.getElementById('rt-modal-title').innerText = 'New Reminder Template';
-            document.getElementById('rt-id').value = '';
-            document.getElementById('rt-name').value = '';
-            document.getElementById('rt-timing').value = '1440'; // Default 24h
-            document.getElementById('rt-resend').value = '';
-            document.getElementById('rt-message').value = 'Hi {patient_name}, this is a reminder about your appointment at {appointment_time}. Reply CONFIRM to confirm.';
-            document.getElementById('rt-form').value = '';
-        }
+    if (template) {
+    document.getElementById('rt-modal-title').innerText = 'Edit Reminder Template';
+    document.getElementById('rt-id').value = template.id;
+    document.getElementById('rt-name').value = template.name;
+    document.getElementById('rt-timing').value = template.timing_minutes || (template.timing_hours * 60) || 1440;
+    document.getElementById('rt-resend').value = template.resend_interval_minutes || '';
+    document.getElementById('rt-message').value = template.message_template;
+    document.getElementById('rt-form').value = template.form_id || '';
+    } else {
+    document.getElementById('rt-modal-title').innerText = 'New Reminder Template';
+    document.getElementById('rt-id').value = '';
+    document.getElementById('rt-name').value = '';
+    document.getElementById('rt-timing').value = '1440'; // Default 24h
+    document.getElementById('rt-resend').value = '';
+    document.getElementById('rt-message').value = 'Hi {patient_name}, this is a reminder about your appointment at
+    {appointment_time}. Reply CONFIRM to confirm.';
+    document.getElementById('rt-form').value = '';
+    }
 
-        // Setup Live Preview Listeners
-        const msgInput = document.getElementById('rt-message');
-        const formSelect = document.getElementById('rt-form');
+    // Setup Live Preview Listeners
+    const msgInput = document.getElementById('rt-message');
+    const formSelect = document.getElementById('rt-form');
 
-        msgInput.oninput = updateRTPreview;
-        formSelect.onchange = updateRTPreview;
+    msgInput.oninput = updateRTPreview;
+    formSelect.onchange = updateRTPreview;
 
-        // Initial update
-        updateRTPreview();
+    // Initial update
+    updateRTPreview();
 
-        document.getElementById('reminderTemplateModal').style.display = 'flex';
+    document.getElementById('reminderTemplateModal').style.display = 'flex';
     }
 
     function updateRTPreview() {
-        let msg = document.getElementById('rt-message').value || '';
-        const formSelect = document.getElementById('rt-form');
-        const formId = formSelect.value;
-        const formTitle = formSelect.options[formSelect.selectedIndex] ? formSelect.options[formSelect.selectedIndex].text : 'Form';
+    let msg = document.getElementById('rt-message').value || '';
+    const formSelect = document.getElementById('rt-form');
+    const formId = formSelect.value;
+    const formTitle = formSelect.options[formSelect.selectedIndex] ? formSelect.options[formSelect.selectedIndex].text :
+    'Form';
 
-        // Mock replacements for visualization
-        msg = msg.replace('{patient_name}', 'John Doe');
-        msg = msg.replace('{appointment_time}', 'Tomorrow 10:00 AM');
+    // Mock replacements for visualization
+    msg = msg.replace('{patient_name}', 'John Doe');
+    msg = msg.replace('{appointment_time}', 'Tomorrow 10:00 AM');
 
-        if (formId) {
-            msg += `\n\nComplete forms: http://.../forms/${formId} (${formTitle})`;
-        }
+    if (formId) {
+    msg += `\n\nComplete forms: http://.../forms/${formId} (${formTitle})`;
+    }
 
-        // Mock Calendar Link
-        if (msg.includes('{calendar_link}')) {
-            msg = msg.replace('{calendar_link}', '\n[Add to Calendar Link]');
-        }
+    // Mock Calendar Link
+    if (msg.includes('{calendar_link}')) {
+    msg = msg.replace('{calendar_link}', '\n[Add to Calendar Link]');
+    }
 
-        document.getElementById('rt-preview').innerText = msg;
+    document.getElementById('rt-preview').innerText = msg;
     }
 
     function closeReminderTemplateModal() {
-        document.getElementById('reminderTemplateModal').style.display = 'none';
+    document.getElementById('reminderTemplateModal').style.display = 'none';
     }
 
     async function saveReminderTemplateForm() {
-        const id = document.getElementById('rt-id').value;
-        const name = document.getElementById('rt-name').value;
-        const timingMinutes = document.getElementById('rt-timing').value;
-        const resendMinutes = document.getElementById('rt-resend').value;
-        const msg = document.getElementById('rt-message').value;
-        const formId = document.getElementById('rt-form').value;
+    const id = document.getElementById('rt-id').value;
+    const name = document.getElementById('rt-name').value;
+    const timingMinutes = document.getElementById('rt-timing').value;
+    const resendMinutes = document.getElementById('rt-resend').value;
+    const msg = document.getElementById('rt-message').value;
+    const formId = document.getElementById('rt-form').value;
 
-        if (!name || !msg) {
-            alert('Name and message are required');
-            return;
-        }
+    if (!name || !msg) {
+    alert('Name and message are required');
+    return;
+    }
 
-        const payload = {
-            name: name,
-            message_template: msg,
-            timing_minutes: parseInt(timingMinutes) || 1440,
-            resend_interval_minutes: resendMinutes ? parseInt(resendMinutes) : null,
-            form_id: formId || null
-        };
+    const payload = {
+    name: name,
+    message_template: msg,
+    timing_minutes: parseInt(timingMinutes) || 1440,
+    resend_interval_minutes: resendMinutes ? parseInt(resendMinutes) : null,
+    form_id: formId || null
+    };
 
-        try {
-            let res;
-            if (id) {
-                res = await API.put(`/api/reminder-templates/${id}`, payload);
-            } else {
-                res = await API.post('/api/reminder-templates', payload);
-            }
+    try {
+    let res;
+    if (id) {
+    res = await API.put(`/api/reminder-templates/${id}`, payload);
+    } else {
+    res = await API.post('/api/reminder-templates', payload);
+    }
 
-            if (res.success) {
-                closeReminderTemplateModal();
-                loadReminderTemplates();
-            } else {
-                alert('Error: ' + res.error);
-            }
-        } catch (e) {
-            console.error(e);
-            alert('Error saving template');
-        }
+    if (res.success) {
+    closeReminderTemplateModal();
+    loadReminderTemplates();
+    } else {
+    alert('Error: ' + res.error);
+    }
+    } catch (e) {
+    console.error(e);
+    alert('Error saving template');
+    }
     }
 
     async function deleteReminderTemplate(id) {
-        if (!confirm('Delete this template?')) return;
+    if (!confirm('Delete this template?')) return;
 
-        try {
-            // Use fetch directly since API.delete might not exist
-            const res = await fetch(`/api/reminder-templates/${id}`, { method: 'DELETE' });
-            const data = await res.json();
-            if (data.success) {
-                loadReminderTemplates();
-            }
-        } catch (error) {
-            console.error('Error deleting template:', error);
-        }
+    try {
+    // Use fetch directly since API.delete might not exist
+    const res = await fetch(`/api/reminder-templates/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+    loadReminderTemplates();
+    }
+    } catch (error) {
+    console.error('Error deleting template:', error);
+    }
     }
 
     function saveReminderSettings() {
-        // Save auto-reminder settings (would need backend support)
-        const autoEnabled = document.getElementById('autoRemindersEnabled').checked;
-        const remind24hr = document.getElementById('remind24hr').checked;
-        const remind2hr = document.getElementById('remind2hr').checked;
+    // Save auto-reminder settings (would need backend support)
+    const autoEnabled = document.getElementById('autoRemindersEnabled').checked;
+    const remind24hr = document.getElementById('remind24hr').checked;
+    const remind2hr = document.getElementById('remind2hr').checked;
 
-        // For now, just show confirmation
-        alert('Reminder settings saved successfully!');
+    // For now, just show confirmation
+    alert('Reminder settings saved successfully!');
     }
 
 
@@ -885,127 +1166,129 @@
     let currentFormId = null;
 
     async function loadForms() {
-        try {
-            const res = await API.get('/api/forms');
-            if (res.success) {
-                renderForms(res.forms);
-            }
-        } catch (e) { console.error(e); }
+    try {
+    const res = await API.get('/api/forms');
+    if (res.success) {
+    renderForms(res.forms);
+    }
+    } catch (e) { console.error(e); }
     }
 
     function renderForms(forms) {
-        const list = document.getElementById('formsList');
-        if (forms.length === 0) {
-            list.innerHTML = `
-                <div style="text-align:center; padding: 40px; background:#f8fafc; border-radius:8px; border: 2px dashed #e2e8f0;">
-                    <div style="font-size:30px; margin-bottom:10px;">📝</div>
-                    <p class="text-muted" style="margin-bottom:20px;">No patient forms created yet.</p>
-                    <button class="btn btn-primary" onclick="showFormBuilder()">+ Create First Form</button>
-                </div>
-            `;
-            return;
-        }
-        list.innerHTML = forms.map(f => `
-            <div class="card p-3 mb-2">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div><strong>${f.title}</strong><br><small class="text-muted">${f.description || ''}</small></div>
-                    <div style="display:flex; gap:5px;">
-                        <button class="btn btn-sm btn-outline" onclick='editForm(${JSON.stringify(f).replace(/'/g, "&#39;")})'>Edit</button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteForm(${f.id})">Delete</button>
-                    </div>
-                </div>
+    const list = document.getElementById('formsList');
+    if (forms.length === 0) {
+    list.innerHTML = `
+    <div style="text-align:center; padding: 40px; background:#f8fafc; border-radius:8px; border: 2px dashed #e2e8f0;">
+        <div style="font-size:30px; margin-bottom:10px;">📝</div>
+        <p class="text-muted" style="margin-bottom:20px;">No patient forms created yet.</p>
+        <button class="btn btn-primary" onclick="showFormBuilder()">+ Create First Form</button>
+    </div>
+    `;
+    return;
+    }
+    list.innerHTML = forms.map(f => `
+    <div class="card p-3 mb-2">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div><strong>${f.title}</strong><br><small class="text-muted">${f.description || ''}</small></div>
+            <div style="display:flex; gap:5px;">
+                <button class="btn btn-sm btn-outline" onclick='editForm(${JSON.stringify(f).replace(/' /g, "&#39;"
+                    )})'>Edit</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteForm(${f.id})">Delete</button>
             </div>
-        `).join('');
+        </div>
+    </div>
+    `).join('');
     }
 
     function showFormBuilder(form = null) {
-        document.getElementById('formsList').style.display = 'none';
-        document.getElementById('formBuilderUI').style.display = 'block';
-        document.getElementById('fb-fields-container').innerHTML = '';
+    document.getElementById('formsList').style.display = 'none';
+    document.getElementById('formBuilderUI').style.display = 'block';
+    document.getElementById('fb-fields-container').innerHTML = '';
 
-        if (form) {
-            currentFormId = form.id;
-            document.getElementById('fb-title').value = form.title;
-            document.getElementById('fb-desc').value = form.description || '';
-            (form.fields || []).forEach(field => addFormField(field));
-        } else {
-            currentFormId = null;
-            document.getElementById('fb-title').value = '';
-            document.getElementById('fb-desc').value = '';
-            addFormField();
-        }
+    if (form) {
+    currentFormId = form.id;
+    document.getElementById('fb-title').value = form.title;
+    document.getElementById('fb-desc').value = form.description || '';
+    (form.fields || []).forEach(field => addFormField(field));
+    } else {
+    currentFormId = null;
+    document.getElementById('fb-title').value = '';
+    document.getElementById('fb-desc').value = '';
+    addFormField();
+    }
     }
 
     function closeFormBuilder() {
-        document.getElementById('formsList').style.display = 'block';
-        document.getElementById('formBuilderUI').style.display = 'none';
-        currentFormId = null;
+    document.getElementById('formsList').style.display = 'block';
+    document.getElementById('formBuilderUI').style.display = 'none';
+    currentFormId = null;
     }
 
     function addFormField(data = {}) {
-        const container = document.getElementById('fb-fields-container');
-        const div = document.createElement('div');
-        div.className = 'card p-3 mb-2 field-row';
-        div.style.background = '#f8fafc';
-        div.innerHTML = `
-            <div style="display:flex; gap: 10px; align-items:center;">
-                <div style="flex:2;">
-                    <label style="font-size:0.8em; color:#666;">Question / Label</label>
-                    <input type="text" class="form-control field-label" placeholder="e.g. Do you have any allergies?" value="${data.label || ''}">
-                </div>
-                <div style="flex:1;">
-                    <label style="font-size:0.8em; color:#666;">Type</label>
-                    <select class="form-control field-type">
-                        <option value="text" ${data.type === 'text' ? 'selected' : ''}>Text Input</option>
-                        <option value="textarea" ${data.type === 'textarea' ? 'selected' : ''}>Long Text</option>
-                        <option value="yesno" ${data.type === 'yesno' ? 'selected' : ''}>Yes/No</option>
-                        <option value="signature" ${data.type === 'signature' ? 'selected' : ''}>Signature</option>
-                        <option value="header" ${data.type === 'header' ? 'selected' : ''}>Header (Section)</option>
-                    </select>
-                </div>
-                <div style="align-self: flex-end;">
-                    <button class="btn btn-sm btn-danger" onclick="this.closest('.field-row').remove()">X</button>
-                </div>
-            </div>
-        `;
-        container.appendChild(div);
+    const container = document.getElementById('fb-fields-container');
+    const div = document.createElement('div');
+    div.className = 'card p-3 mb-2 field-row';
+    div.style.background = '#f8fafc';
+    div.innerHTML = `
+    <div style="display:flex; gap: 10px; align-items:center;">
+        <div style="flex:2;">
+            <label style="font-size:0.8em; color:#666;">Question / Label</label>
+            <input type="text" class="form-control field-label" placeholder="e.g. Do you have any allergies?"
+                value="${data.label || ''}">
+        </div>
+        <div style="flex:1;">
+            <label style="font-size:0.8em; color:#666;">Type</label>
+            <select class="form-control field-type">
+                <option value="text" ${data.type==='text' ? 'selected' : '' }>Text Input</option>
+                <option value="textarea" ${data.type==='textarea' ? 'selected' : '' }>Long Text</option>
+                <option value="yesno" ${data.type==='yesno' ? 'selected' : '' }>Yes/No</option>
+                <option value="signature" ${data.type==='signature' ? 'selected' : '' }>Signature</option>
+                <option value="header" ${data.type==='header' ? 'selected' : '' }>Header (Section)</option>
+            </select>
+        </div>
+        <div style="align-self: flex-end;">
+            <button class="btn btn-sm btn-danger" onclick="this.closest('.field-row').remove()">X</button>
+        </div>
+    </div>
+    `;
+    container.appendChild(div);
     }
 
     async function saveCurrentForm() {
-        const title = document.getElementById('fb-title').value;
-        const description = document.getElementById('fb-desc').value;
-        const fields = [];
-        document.querySelectorAll('.field-row').forEach(row => {
-            const label = row.querySelector('.field-label').value;
-            if (label) {
-                fields.push({
-                    label: label,
-                    type: row.querySelector('.field-type').value
-                });
-            }
-        });
+    const title = document.getElementById('fb-title').value;
+    const description = document.getElementById('fb-desc').value;
+    const fields = [];
+    document.querySelectorAll('.field-row').forEach(row => {
+    const label = row.querySelector('.field-label').value;
+    if (label) {
+    fields.push({
+    label: label,
+    type: row.querySelector('.field-type').value
+    });
+    }
+    });
 
-        if (!title) return alert('Title required');
+    if (!title) return alert('Title required');
 
-        const payload = { id: currentFormId, title, description, fields };
-        const res = await API.post('/api/forms', payload);
-        if (res.success) {
-            closeFormBuilder();
-            loadForms();
-        } else {
-            alert('Error saving form');
-        }
+    const payload = { id: currentFormId, title, description, fields };
+    const res = await API.post('/api/forms', payload);
+    if (res.success) {
+    closeFormBuilder();
+    loadForms();
+    } else {
+    alert('Error saving form');
+    }
     }
 
     function editForm(form) {
-        showFormBuilder(form);
+    showFormBuilder(form);
     }
 
     async function deleteForm(id) {
-        if (!confirm('Delete this form?')) return;
-        await API.delete('/api/forms/' + id);
-        loadForms();
+    if (!confirm('Delete this form?')) return;
+    await API.delete('/api/forms/' + id);
+    loadForms();
     }
-</script>
-{% endblock %}
-```
+    </script>
+    {% endblock %}
+    ```

@@ -274,6 +274,20 @@ def init_db():
             active BOOLEAN DEFAULT 1
         )
     ''')
+    
+    # Doctor Schedules (Weekly)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS doctor_schedules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            doctor_id INTEGER NOT NULL,
+            day_of_week INTEGER NOT NULL, -- 0=Monday, 6=Sunday
+            start_time TEXT, -- HH:MM (24h)
+            end_time TEXT, -- HH:MM (24h)
+            is_available BOOLEAN DEFAULT 1,
+            FOREIGN KEY (doctor_id) REFERENCES doctors (id),
+            UNIQUE(doctor_id, day_of_week)
+        )
+    ''')
 
     try:
         cursor.execute('ALTER TABLE queue_entries ADD COLUMN doctor_id INTEGER')

@@ -2057,6 +2057,73 @@ def api_check_notifications():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # ============================================================================
+# API Routes - Schedules
+# ============================================================================
+
+@app.route('/api/schedules', methods=['GET'])
+def api_get_schedules():
+    """Get all doctor schedules"""
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        
+        # Get doctors
+        cursor.execute("SELECT * FROM doctors WHERE active = 1")
+        doctors = [dict(row) for row in cursor.fetchall()]
+        
+        # Get schedules
+        cursor.execute("SELECT * FROM doctor_schedules")
+        schedules_raw = [dict(row) for row in cursor.fetchall()]
+        
+        # Map schedules to doctors
+        schedules_by_doc = {}
+        for s in schedules_raw:
+            did = s['doctor_id']
+            if did not in schedules_by_doc:
+                schedules_by_doc[did] = []
+            schedules_by_doc[did].append(s)
+            
+        # Attach to doctors
+        for d in doctors:
+            d['schedule'] = schedules_by_doc.get(d['id'], [])
+            
+        db.close()
+        return jsonify({'success': True, 'doctors': doctors})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/schedules', methods=['POST'])
+def api_update_schedule():
+    """Update a specific schedule entry"""
+    try:
+        data = request.json
+        doctor_id = data.get('doctor_id')
+        day_of_week = data.get('day_of_week')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+        is_available = data.get('is_available', True)
+        
+        db = get_db()
+        cursor = db.cursor()
+        
+        # Upsert
+        cursor.execute('''
+            INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_available)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(doctor_id, day_of_week) DO UPDATE SET
+            start_time=excluded.start_time,
+            end_time=excluded.end_time,
+            is_available=excluded.is_available
+        ''', (doctor_id, day_of_week, start_time, end_time, is_available))
+        
+        db.commit()
+        db.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ============================================================================
 # API Routes - Patient Forms
 # ============================================================================
 
