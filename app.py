@@ -1217,8 +1217,8 @@ def handle_subdomains():
 
 @app.route('/')
 def index():
-    """Home page - redirect to dashboard"""
-    return render_template('index.html')
+    """Home page - New SaaS Landing Page"""
+    return render_template('landing.html')
 
 @app.route('/dashboard')
 def dashboard():
