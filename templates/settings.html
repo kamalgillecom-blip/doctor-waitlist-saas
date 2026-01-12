@@ -974,14 +974,6 @@ renderReminderTemplates(res.templates);
 } catch (error) {
 console.error('Error loading reminder templates:', error);
 }
-try {
-const res = await API.get('/api/reminder-templates');
-if (res.success) {
-renderReminderTemplates(res.templates);
-}
-} catch (error) {
-console.error('Error loading reminder templates:', error);
-}
 }
 
 function formatTiming(minutes) {
