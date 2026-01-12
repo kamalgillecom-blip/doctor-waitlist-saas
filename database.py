@@ -302,6 +302,12 @@ def init_db():
         )
     ''')
 
+    # Ensure doctors has email column (Migration)
+    try:
+        cursor.execute('ALTER TABLE doctors ADD COLUMN email TEXT')
+    except:
+        pass
+
     try:
         cursor.execute('ALTER TABLE queue_entries ADD COLUMN doctor_id INTEGER')
     except:
