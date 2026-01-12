@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}Super Admin - SaaS Dashboard{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/dashboard.css">
+<style>
+    .admin-card {
+        background: white;
+        border-radius: var(--radius-lg);
+        padding: var(--space-lg);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--color-border);
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--color-primary);
+    }
+
+    .tenant-row {
+        transition: background 0.2s;
+    }
+
+    .tenant-row:hover {
+        background: var(--color-bg);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; height: 100vh;">
+    <!-- Admin Sidebar -->
+    <div class="sidebar" style="background: #1e293b;">
+        <div class="sidebar-nav">
+            <a href="/admin" class="sidebar-item active" title="Admin Home" style="color:white;">
+                <span>🛡️</span>
+            </a>
+            <a href="/dashboard" class="sidebar-item" title="Back to App">
+                <span>🔙</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div style="flex: 1; padding: var(--space-xl); overflow-y: auto; background: #f1f5f9;">
+        <div class="flex-between" style="margin-bottom: var(--space-xl);">
+            <div>
+                <h1 style="color: #0f172a;">SaaS Administration</h1>
+                <p class="text-muted">Manage tenants, licences, and global settings</p>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-secondary" onclick="loadTenants()">Refresh Data</button>
+            </div>
+        </div>
+
+        <!-- Stats Overview -->
+        <div class="grid grid-3" style="margin-bottom: var(--space-xl);">
+            <div class="admin-card">
+                <h3 class="text-muted" style="font-size: 0.9rem; text-transform: uppercase;">Total Tenants</h3>
+                <div class="stat-value" id="statTenants">-</div>
+            </div>
+            <div class="admin-card">
+                <h3 class="text-muted" style="font-size: 0.9rem; text-transform: uppercase;">Total SMS Sent</h3>
+                <div class="stat-value" id="statSMS">-</div>
+            </div>
+            <div class="admin-card">
+                <h3 class="text-muted" style="font-size: 0.9rem; text-transform: uppercase;">Active Licences</h3>
+                <div class="stat-value" id="statLicences">-</div>
+            </div>
+        </div>
+
+        <!-- Tenants List -->
+        <div class="admin-card">
+            <h2>Registered Clinics</h2>
+            <table class="table" id="tenantsTable" style="width:100%; text-align:left;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #e2e8f0;">
+                        <th style="padding:15px;">ID</th>
+                        <th>Clinic Name</th>
+                        <th>Plan</th>
+                        <th>Status</th>
+                        <th>Usage (Appts)</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="tenantsList">
+                    <tr>
+                        <td colspan="6" class="text-muted" style="padding:20px;">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Tenant Modal -->
+<div id="tenantModal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Manage Tenant</h2>
+            <button class="close-btn"
+                onclick="document.getElementById('tenantModal').style.display='none'">&times;</button>
+        </div>
+        <div class="modal-content">
+            <input type="hidden" id="editTenantId">
+            <div class="form-group">
+                <label>Clinic Name</label>
+                <input type="text" id="editTenantName">
+            </div>
+            <div class="form-group">
+                <label>Plan / Licence</label>
+                <select id="editTenantPlan">
+                    <option value="basic">Basic</option>
+                    <option value="pro">Pro</option>
+                    <option value="enterprise">Enterprise</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Logo URL (External)</label>
+                <input type="text" id="editTenantLogo" placeholder="https://example.com/logo.png">
+            </div>
+
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3>Theme Settings</h3>
+                <label style="display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" id="editThemeOverride">
+                    Force Override
+                </label>
+            </div>
+
+            <div class="grid grid-3">
+                <div>
+                    <label>Primary</label>
+                    <input type="color" id="editThemePrimary" style="width:100%; height:40px;">
+                </div>
+                <div>
+                    <label>Secondary</label>
+                    <input type="color" id="editThemeSecondary" style="width:100%; height:40px;">
+                </div>
+                <div>
+                    <label>Accent</label>
+                    <input type="color" id="editThemeAccent" style="width:100%; height:40px;">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger" id="btnDeleteTenant">Deactivate</button>
+            <button class="btn btn-primary" onclick="saveTenant()">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', loadTenants);
+
+    async function loadTenants() {
+        try {
+            const res = await API.get('/api/admin/tenants');
+            if (res.success) {
+                // Update stats
+                document.getElementById('statTenants').textContent = res.tenants.length;
+                document.getElementById('statSMS').textContent = res.total_sms || 0;
+                document.getElementById('statLicences').textContent = res.tenants.filter(t => t.active).length;
+
+                // Render table
+                const tbody = document.getElementById('tenantsList');
+                if (res.tenants.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6">No tenants found.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = res.tenants.map(t => `
+                    <tr class="tenant-row" style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding:15px;">#${t.id}</td>
+                        <td><strong>${t.name}</strong><br><small class="text-muted">${t.address || ''}</small></td>
+                        <td><span class="badge badge-info">${t.plan || 'Free'}</span></td>
+                        <td>
+                            ${t.active ?
+                        '<span class="badge badge-success">Active</span>' :
+                        '<span class="badge badge-danger">Inactive</span>'}
+                        </td>
+                        <td>${t.appt_count || 0}</td>
+                        <td>
+                            <button class="btn btn-sm btn-secondary" onclick="openTenantModal(${t.id})">Manage</button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                // Store tenants locally for modal
+                window.allTenants = res.tenants;
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error loading admin data');
+        }
+    }
+
+    function openTenantModal(id) {
+        const t = window.allTenants.find(x => x.id === id);
+        if (!t) return;
+
+        document.getElementById('editTenantId').value = t.id;
+        document.getElementById('editTenantName').value = t.name;
+        document.getElementById('editTenantPlan').value = t.plan || 'basic';
+        document.getElementById('editTenantLogo').value = t.logo_url || '';
+        document.getElementById('editThemeOverride').checked = !!t.theme_override; // Ensure boolean
+
+        // Colors
+        let colors = {};
+        try { colors = JSON.parse(t.theme_colors || '{}'); } catch (e) { }
+        document.getElementById('editThemePrimary').value = colors.primary || '#3b82f6';
+        document.getElementById('editThemeSecondary').value = colors.secondary || '#10b981';
+        document.getElementById('editThemeAccent').value = colors.accent || '#f59e0b';
+
+        document.getElementById('tenantModal').style.display = 'flex';
+    }
+
+    async function saveTenant() {
+        const id = document.getElementById('editTenantId').value;
+        const payload = {
+            name: document.getElementById('editTenantName').value,
+            plan: document.getElementById('editTenantPlan').value,
+            logo_url: document.getElementById('editTenantLogo').value,
+            theme_override: document.getElementById('editThemeOverride').checked ? 1 : 0,
+            theme_colors: {
+                primary: document.getElementById('editThemePrimary').value,
+                secondary: document.getElementById('editThemeSecondary').value,
+                accent: document.getElementById('editThemeAccent').value
+            }
+        };
+
+        const res = await API.put(`/api/admin/tenants/${id}`, payload);
+        if (res.success) {
+            document.getElementById('tenantModal').style.display = 'none';
+            loadTenants();
+        } else {
+            alert('Error updating tenant: ' + res.error);
+        }
+    }
+</script>
+{% endblock %}

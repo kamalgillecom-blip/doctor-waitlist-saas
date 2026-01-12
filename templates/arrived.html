@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}I'm Here{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/dashboard.css">
+<style>
+    .arrived-page {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: linear-gradient(135deg, #ccfbf1 0%, #5eead4 100%);
+    }
+
+    .arrived-card {
+        background: white;
+        border-radius: 16px;
+        padding: 40px;
+        max-width: 500px;
+        width: 100%;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    }
+
+    .arrived-icon {
+        font-size: 4rem;
+        margin-bottom: 20px;
+    }
+
+    .arrived-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+        color: #1f2937;
+    }
+
+    .arrived-subtitle {
+        color: #6b7280;
+        margin-bottom: 30px;
+    }
+
+    .office-address {
+        background: #f0fdfa;
+        border: 2px solid #14b8a6;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+
+    .office-address-label {
+        font-size: 0.85rem;
+        color: #0d9488;
+        margin-bottom: 8px;
+        font-weight: 600;
+    }
+
+    .office-address-text {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    .appt-info {
+        background: #f9fafb;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 30px;
+        text-align: left;
+    }
+
+    .appt-info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+    }
+
+    .arrived-btn {
+        width: 100%;
+        padding: 16px 32px;
+        background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .arrived-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.4);
+    }
+
+    .arrived-btn:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .success-message {
+        background: #d1fae5;
+        color: #065f46;
+        padding: 20px;
+        border-radius: 12px;
+        margin-top: 20px;
+    }
+
+    .error-message {
+        background: #fee2e2;
+        color: #991b1b;
+        padding: 20px;
+        border-radius: 12px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="arrived-page">
+    <div class="arrived-card">
+        {% if error %}
+        <div class="arrived-icon">❌</div>
+        <h1 class="arrived-title">Link Not Found</h1>
+        <p class="arrived-subtitle">This arrival link is invalid or has expired.</p>
+        <div class="error-message">
+            Please contact the office when you arrive.
+        </div>
+        {% else %}
+        <div class="arrived-icon">📍</div>
+        <h1 class="arrived-title">Welcome, {{ appointment.first_name }}!</h1>
+        <p class="arrived-subtitle">Tap the button below when you arrive at the office.</p>
+
+        <div class="office-address">
+            <div class="office-address-label">OFFICE LOCATION</div>
+            <div class="office-address-text">{{ office_address }}</div>
+        </div>
+
+        <div class="appt-info">
+            <div class="appt-info-row">
+                <span style="color: #6b7280;">Appointment</span>
+                <span id="apptTime" style="font-weight: 600;">{{ appointment.appointment_time }}</span>
+            </div>
+        </div>
+
+        <button class="arrived-btn" id="arrivedBtn" onclick="markArrived()">
+            📍 I'm Here!
+        </button>
+
+        <div id="successMsg" class="success-message" style="display: none;">
+            ✓ Great! We know you've arrived. Please come inside!
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Format the appointment time nicely
+    document.addEventListener('DOMContentLoaded', () => {
+        const timeEl = document.getElementById('apptTime');
+        if (timeEl) {
+            const date = new Date(timeEl.textContent);
+            timeEl.textContent = date.toLocaleString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+        }
+    });
+
+    async function markArrived() {
+        const btn = document.getElementById('arrivedBtn');
+        btn.disabled = true;
+        btn.textContent = 'Sending...';
+
+        try {
+            const res = await fetch('/arrived/{{ token }}/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (res.ok) {
+                btn.style.display = 'none';
+                document.getElementById('successMsg').style.display = 'block';
+            } else {
+                btn.disabled = false;
+                btn.textContent = "📍 I'm Here!";
+                alert('Failed to send. Please try again.');
+            }
+        } catch (e) {
+            btn.disabled = false;
+            btn.textContent = "📍 I'm Here!";
+            alert('Error: ' + e.message);
+        }
+    }
+</script>
+{% endblock %}

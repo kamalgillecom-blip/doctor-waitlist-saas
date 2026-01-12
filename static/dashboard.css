@@ -1,0 +1,1102 @@
+/* Dashboard-specific styles for 4-column layout */
+
+:root {
+    --sidebar-width: 70px;
+    --column-gap: 16px;
+}
+
+/* Sidebar Navigation */
+.dashboard-layout {
+    display: flex;
+    min-height: 100vh;
+    background: var(--color-bg);
+}
+
+.sidebar {
+    width: var(--sidebar-width);
+    background: linear-gradient(180deg, #0f4994 0%, #0a3570 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--space-lg) 0;
+    box-shadow: var(--shadow-lg);
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 100;
+}
+
+/* Logo styling */
+.sidebar-logo {
+    width: 50px;
+    height: auto;
+    margin-bottom: var(--space-md);
+    transition: transform var(--transition-base);
+}
+
+.sidebar-logo:hover {
+    transform: scale(1.05);
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+}
+
+.sidebar-item {
+    position: relative;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    color: white;
+    text-decoration: none;
+    font-size: 1.5rem;
+    transition: all var(--transition-base);
+    cursor: pointer;
+}
+
+.sidebar-item svg {
+    width: 24px;
+    height: 24px;
+    fill: white;
+    transition: fill var(--transition-base);
+}
+
+.sidebar-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateX(3px);
+}
+
+.sidebar-item:hover svg {
+    fill: #af295f;
+}
+
+.sidebar-item.active {
+    background: rgba(175, 41, 95, 0.3);
+    border: 1px solid rgba(175, 41, 95, 0.5);
+}
+
+.sidebar-item.active svg {
+    fill: #af295f;
+}
+
+.sidebar-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: var(--color-danger);
+    color: white;
+    border-radius: var(--radius-full);
+    min-width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    padding: 0 var(--space-xs);
+}
+
+/* Main Dashboard Content */
+.dashboard-content {
+    margin-left: var(--sidebar-width);
+    flex: 1;
+    padding: var(--space-lg);
+}
+
+.dashboard-header {
+    background: linear-gradient(135deg, #0f4994 0%, #1a5ab8 50%, #c81d6e 100%);
+    color: white;
+    padding: var(--space-xl);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-xl);
+    box-shadow: var(--shadow-xl);
+}
+
+.dashboard-title {
+    font-size: var(--font-size-3xl);
+    margin: 0 0 var(--space-sm) 0;
+}
+
+.dashboard-subtitle {
+    opacity: 0.9;
+    margin: 0;
+}
+
+/* 4-Column Grid */
+.columns-container {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--column-gap);
+}
+
+.column {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 250px);
+}
+
+.column-header {
+    padding: var(--space-lg);
+    border-bottom: 2px solid var(--color-border-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.column-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.column-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+    background: var(--color-primary-light);
+    color: var(--color-primary-dark);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    padding: 0 var(--space-sm);
+}
+
+.column-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-md);
+}
+
+/* Enhanced Patient Card */
+.patient-card {
+    background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-hover) 100%);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-md);
+    transition: all var(--transition-base);
+    position: relative;
+}
+
+.patient-card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+}
+
+.patient-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-sm);
+}
+
+.patient-position {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: var(--color-primary);
+    color: white;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.patient-info {
+    flex: 1;
+    margin-left: var(--space-md);
+}
+
+.patient-name {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    margin-bottom: var(--space-xs);
+}
+
+.patient-details {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.patient-actions {
+    display: flex;
+    gap: var(--space-xs);
+    margin-top: var(--space-md);
+    flex-wrap: wrap;
+}
+
+/* Message Indicator Badge */
+.message-badge {
+    position: absolute;
+    top: var(--space-sm);
+    right: var(--space-sm);
+    background: var(--color-danger);
+    color: white;
+    border-radius: var(--radius-full);
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+/* Alert Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn var(--transition-base);
+}
+
+.modal {
+    background: var(--color-surface);
+    border-radius: var(--radius-xl);
+    padding: var(--space-2xl);
+    max-width: 500px;
+    width: 90%;
+    box-shadow: var(--shadow-xl);
+    animation: fadeIn var(--transition-base);
+}
+
+.modal-header {
+    margin-bottom: var(--space-lg);
+}
+
+.modal-header h3 {
+    margin: 0 0 var(--space-xs) 0;
+}
+
+.modal-body {
+    margin-bottom: var(--space-xl);
+}
+
+.modal-actions {
+    display: flex;
+    gap: var(--space-md);
+    justify-content: flex-end;
+}
+
+/* Empty State */
+.column-empty {
+    text-align: center;
+    padding: var(--space-2xl);
+    color: var(--color-text-tertiary);
+}
+
+.column-empty-icon {
+    font-size: 3rem;
+    opacity: 0.3;
+    margin-bottom: var(--space-md);
+}
+
+/* Dashboard Grid Layout */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-lg);
+}
+
+.left-columns {
+    display: flex;
+    flex-direction: row;
+    gap: var(--space-lg);
+}
+
+.left-columns .column {
+    flex: 1;
+    min-height: 300px;
+    max-height: calc(100vh - 300px);
+}
+
+/* Rooms Section */
+.rooms-section {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    padding: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+}
+
+.rooms-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-md);
+    padding-bottom: var(--space-md);
+    border-bottom: 2px solid var(--color-border-light);
+}
+
+.room-box-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-md);
+}
+
+.room-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-icon-danger {
+    background: transparent;
+    border: none;
+    color: var(--color-text-tertiary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.btn-icon-danger:hover {
+    color: var(--color-danger);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.btn-icon-secondary {
+    background: transparent;
+    border: none;
+    color: var(--color-text-tertiary);
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.btn-icon-secondary:hover {
+    color: var(--color-primary);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.rooms-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    column-gap: var(--space-md);
+    row-gap: 0;
+    flex: 1;
+    overflow-y: auto;
+    align-items: start;
+}
+
+/* Room Box */
+.room-box {
+    background: var(--color-background);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 10px;
+    min-height: 80px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.room-box-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.room-name {
+    flex: 1;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1.1em;
+    color: var(--color-text);
+}
+
+.room-box.empty {
+    border-style: dashed;
+    border-color: var(--color-border-light);
+}
+
+/* Room Patients List */
+.room-patients-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+/* Individual Patient Card in Room */
+.room-patient-card {
+    background: #fff;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 8px;
+    font-size: 0.9em;
+    position: relative;
+    border-left: 3px solid transparent;
+}
+
+.room-patient-card.status-vitals {
+    border-left-color: #f59e0b;
+}
+
+.room-patient-card.status-dr-visited {
+    border-left-color: #10b981;
+}
+
+.room-patient-card.status-waiting-rx {
+    border-left-color: #ef4444;
+}
+
+.room-patient-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.room-patient-name {
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.room-timer {
+    font-size: 0.85em;
+    color: var(--color-text-light);
+    background: #f1f5f9;
+    padding: 2px 6px;
+    border-radius: 10px;
+}
+
+.room-status-flags {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.status-flag {
+    flex: 1;
+    text-align: center;
+    padding: 2px;
+    background: #f1f5f9;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1.1em;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.status-flag:hover {
+    background: #e2e8f0;
+}
+
+.status-flag.active {
+    background: #fff;
+    border-color: currentColor;
+}
+
+.status-flag.vitals.active {
+    color: #f59e0b;
+    border-color: #f59e0b;
+    background: #fffbeb;
+}
+
+.status-flag.dr-visited.active {
+    color: #10b981;
+    border-color: #10b981;
+    background: #ecfdf5;
+}
+
+.status-flag.waiting-rx.active {
+    color: #ef4444;
+    border-color: #ef4444;
+    background: #fef2f2;
+}
+
+.room-actions-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.btn-xs {
+    padding: 2px 8px;
+    font-size: 0.8em;
+    line-height: 1.2;
+}
+
+.status-flag.vitals.active {
+    background: #f59e0b;
+}
+
+.status-flag.dr-visited.active {
+    background: #22c55e;
+}
+
+.status-flag.waiting-rx.active {
+    background: #ef4444;
+}
+
+.status-flag.custom.active {
+    background: #a855f7;
+}
+
+/* Room Color Coding based on status */
+.room-box.status-vitals {
+    border-left: 4px solid #f59e0b;
+}
+
+.room-box.status-dr-visited {
+    border-left: 4px solid #22c55e;
+}
+
+.room-box.status-waiting-rx {
+    border-left: 4px solid #ef4444;
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.room-box.status-custom {
+    border-left: 4px solid #a855f7;
+}
+
+.room-actions {
+    display: flex;
+    gap: var(--space-xs);
+    margin-top: var(--space-sm);
+}
+
+.room-actions button {
+    flex: 1;
+    padding: 6px;
+    font-size: var(--font-size-xs);
+}
+
+/* Completed Section (Bottom Bar) */
+.completed-section {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    padding: var(--space-md) var(--space-lg);
+}
+
+.completed-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-md);
+}
+
+.completed-scroll {
+    display: flex;
+    gap: var(--space-md);
+    overflow-x: auto;
+    padding-bottom: var(--space-sm);
+}
+
+.completed-scroll::-webkit-scrollbar {
+    height: 6px;
+}
+
+.completed-scroll::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 3px;
+}
+
+.completed-card {
+    flex-shrink: 0;
+    width: 180px;
+    background: var(--color-background);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+}
+
+.completed-card .patient-name {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    margin-bottom: 4px;
+}
+
+.completed-card .completed-time {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+}
+
+.completed-card.no-show {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.05);
+}
+
+/* Draggable Cards */
+.patient-card[draggable="true"] {
+    cursor: grab;
+}
+
+.patient-card[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.patient-card.dragging {
+    opacity: 0.5;
+    transform: rotate(2deg);
+}
+
+/* Responsive */
+@media (max-width: 1400px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .left-columns {
+        flex-direction: row;
+    }
+
+    .rooms-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .left-columns {
+        flex-direction: column;
+    }
+
+    .rooms-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        width: 60px;
+    }
+
+    .dashboard-content {
+        margin-left: 60px;
+    }
+}
+
+/* ============================================
+   Appointment Status Indicators
+   ============================================ */
+
+.status-indicators {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.status-circle {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    background: currentColor;
+    opacity: 0.15;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.status-circle:hover {
+    transform: scale(1.2);
+    opacity: 0.4;
+}
+
+.status-circle.active {
+    opacity: 1;
+}
+
+/* Tooltip on hover */
+.status-circle::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1f2937;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s;
+    z-index: 100;
+    pointer-events: none;
+}
+
+.status-circle:hover::after {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Unread SMS Badge */
+.unread-sms-badge {
+    display: inline-flex;
+    font-size: 12px;
+    color: #dc2626;
+    animation: pulse-sms 1.5s infinite;
+    cursor: pointer;
+}
+
+@keyframes pulse-sms {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Yellow - Confirmed */
+.status-circle.confirmed {
+    border-color: #f59e0b;
+    color: #f59e0b;
+}
+
+.status-circle.confirmed.active {
+    background: #fbbf24;
+    border-color: #fbbf24;
+    box-shadow: 0 0 8px 3px rgba(251, 191, 36, 0.6), 0 0 16px 6px rgba(251, 191, 36, 0.3);
+}
+
+/* Teal - Arrived */
+.status-circle.arrived {
+    border-color: #14b8a6;
+    color: #14b8a6;
+}
+
+.status-circle.arrived.active {
+    background: #2dd4bf;
+    border-color: #2dd4bf;
+    box-shadow: 0 0 8px 3px rgba(45, 212, 191, 0.6), 0 0 16px 6px rgba(45, 212, 191, 0.3);
+}
+
+/* Green - Checked In */
+.status-circle.checked-in {
+    border-color: #22c55e;
+    color: #22c55e;
+}
+
+.status-circle.checked-in.active {
+    background: #4ade80;
+    border-color: #4ade80;
+    box-shadow: 0 0 8px 3px rgba(74, 222, 128, 0.6), 0 0 16px 6px rgba(74, 222, 128, 0.3);
+}
+
+/* Purple - Stepping Out */
+.status-circle.stepping-out {
+    border-color: #a855f7;
+    color: #a855f7;
+}
+
+.status-circle.stepping-out.active {
+    background: #c084fc;
+    border-color: #c084fc;
+    box-shadow: 0 0 8px 3px rgba(192, 132, 252, 0.6), 0 0 16px 6px rgba(192, 132, 252, 0.3);
+}
+
+/* ============================================
+   Appointment Detail Modal
+   ============================================ */
+
+.appt-detail-modal {
+    width: 600px;
+    max-width: 95vw;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.appt-detail-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.appt-detail-header h2 {
+    margin: 0 0 8px 0;
+}
+
+.appt-detail-time {
+    color: var(--color-text-secondary);
+    font-size: 0.9em;
+}
+
+.appt-detail-actions {
+    display: flex;
+    gap: 10px;
+    padding: 16px 20px;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.appt-detail-actions .btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 100px;
+}
+
+/* Ensure button visibility in modals */
+.appt-detail-actions .btn-primary {
+    background: #c81d6e !important;
+    color: white !important;
+}
+
+.appt-detail-actions .btn-success {
+    background: #22c55e !important;
+    color: white !important;
+}
+
+.appt-detail-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--color-border);
+    padding: 0 20px;
+}
+
+.appt-tab-btn {
+    padding: 12px 16px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+}
+
+.appt-tab-btn.active {
+    border-bottom-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.appt-detail-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.appt-tab-content {
+    display: none;
+}
+
+.appt-tab-content.active {
+    display: block;
+}
+
+.appt-status-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.appt-status-row:last-child {
+    border-bottom: none;
+}
+
+.appt-status-label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.appt-status-indicator {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.appt-status-indicator.active {
+    background: currentColor;
+}
+
+.appt-status-indicator.yellow {
+    color: #f59e0b;
+}
+
+.appt-status-indicator.teal {
+    color: #14b8a6;
+}
+
+.appt-status-indicator.green {
+    color: #22c55e;
+}
+
+.appt-status-indicator.purple {
+    color: #a855f7;
+}
+
+/* Stepping Out Button in Patient Portal */
+.stepping-out-section {
+    margin-top: var(--space-lg);
+    padding: var(--space-lg);
+    background: linear-gradient(135deg, #f3e8ff 0%, #fae8ff 100%);
+    border-radius: var(--radius-lg);
+    border: 2px solid #a855f7;
+}
+
+.stepping-out-btn {
+    width: 100%;
+    padding: 16px 24px;
+    background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.stepping-out-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+}
+
+.stepping-out-btn.active {
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+}
+
+.stepping-out-alert {
+    margin-top: var(--space-md);
+    padding: var(--space-md);
+    background: white;
+    border-radius: var(--radius-md);
+    color: #7c3aed;
+    font-weight: 500;
+    text-align: center;
+}/ *   = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =  
+       G l o b a l   B u t t o n   S t y l e s   ( F i x   f o r   I n v i s i b l e   B u t t o n s )  
+       = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =   * /  
+ . b t n   {  
+         d i s p l a y :   i n l i n e - f l e x ;  
+         a l i g n - i t e m s :   c e n t e r ;  
+         j u s t i f y - c o n t e n t :   c e n t e r ;  
+         p a d d i n g :   1 0 p x   2 0 p x ;  
+         b o r d e r - r a d i u s :   v a r ( - - r a d i u s - m d ) ;  
+         f o n t - w e i g h t :   6 0 0 ;  
+         c u r s o r :   p o i n t e r ;  
+         t r a n s i t i o n :   a l l   0 . 2 s ;  
+         b o r d e r :   n o n e ;  
+         f o n t - s i z e :   1 r e m ;  
+         t e x t - d e c o r a t i o n :   n o n e ;  
+         l i n e - h e i g h t :   1 . 5 ;  
+ }  
+  
+ / *   P r i m a r y   B u t t o n   * /  
+ . b t n - p r i m a r y   {  
+         b a c k g r o u n d :   l i n e a r - g r a d i e n t ( 1 3 5 d e g ,   # 0 f 4 9 9 4   0 % ,   # 0 a 3 5 7 0   1 0 0 % ) ;  
+         c o l o r :   w h i t e   ! i m p o r t a n t ;  
+ }  
+  
+ . b t n - p r i m a r y : h o v e r   {  
+         b o x - s h a d o w :   0   4 p x   1 2 p x   r g b a ( 1 5 ,   7 3 ,   1 4 8 ,   0 . 4 ) ;  
+         t r a n s f o r m :   t r a n s l a t e Y ( - 2 p x ) ;  
+ }  
+  
+ / *   S u c c e s s   B u t t o n   * /  
+ . b t n - s u c c e s s   {  
+         b a c k g r o u n d :   l i n e a r - g r a d i e n t ( 1 3 5 d e g ,   # 1 0 b 9 8 1   0 % ,   # 0 5 9 6 6 9   1 0 0 % ) ;  
+         c o l o r :   w h i t e   ! i m p o r t a n t ;  
+ }  
+  
+ . b t n - s u c c e s s : h o v e r   {  
+         b o x - s h a d o w :   0   4 p x   1 2 p x   r g b a ( 1 6 ,   1 8 5 ,   1 2 9 ,   0 . 4 ) ;  
+         t r a n s f o r m :   t r a n s l a t e Y ( - 2 p x ) ;  
+ }  
+  
+ / *   D a n g e r   B u t t o n   * /  
+ . b t n - d a n g e r   {  
+         b a c k g r o u n d :   l i n e a r - g r a d i e n t ( 1 3 5 d e g ,   # e f 4 4 4 4   0 % ,   # b 9 1 c 1 c   1 0 0 % ) ;  
+         c o l o r :   w h i t e   ! i m p o r t a n t ;  
+ }  
+  
+ . b t n - d a n g e r : h o v e r   {  
+         b o x - s h a d o w :   0   4 p x   1 2 p x   r g b a ( 2 3 9 ,   6 8 ,   6 8 ,   0 . 4 ) ;  
+         t r a n s f o r m :   t r a n s l a t e Y ( - 2 p x ) ;  
+ }  
+  
+ / *   O u t l i n e   B u t t o n   * /  
+ . b t n - o u t l i n e   {  
+         b a c k g r o u n d :   w h i t e ;  
+         b o r d e r :   1 p x   s o l i d   v a r ( - - c o l o r - b o r d e r )   ! i m p o r t a n t ;  
+         c o l o r :   v a r ( - - c o l o r - t e x t - s e c o n d a r y )   ! i m p o r t a n t ;  
+ }  
+  
+ . b t n - o u t l i n e : h o v e r   {  
+         b a c k g r o u n d :   # f 8 f a f c ;  
+         b o r d e r - c o l o r :   # 9 4 a 3 b 8   ! i m p o r t a n t ;  
+         c o l o r :   # 1 e 2 9 3 b   ! i m p o r t a n t ;  
+ }  
+  
+ / *   S e c o n d a r y   B u t t o n   * /  
+ . b t n - s e c o n d a r y   {  
+         b a c k g r o u n d :   # e 5 e 7 e b ;  
+         c o l o r :   # 3 7 4 1 5 1   ! i m p o r t a n t ;  
+ }  
+  
+ . b t n - s e c o n d a r y : h o v e r   {  
+         b a c k g r o u n d :   # d 1 d 5 d b ;  
+ }  
+  
+ / *   S m a l l   B u t t o n   V a r i a n t   * /  
+ . b t n - s m   {  
+         p a d d i n g :   6 p x   1 2 p x ;  
+         f o n t - s i z e :   0 . 8 5 r e m ;  
+ }  
+ 

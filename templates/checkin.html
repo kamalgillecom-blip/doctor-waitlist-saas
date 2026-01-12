@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Check In - Patient Portal{% endblock %}
+
+{% block extra_css %}
+<style>
+    .checkin-page {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--space-lg);
+        background: linear-gradient(135deg, hsl(210, 100%, 95%) 0%, hsl(210, 80%, 98%) 100%);
+    }
+
+    .checkin-container {
+        max-width: 500px;
+        width: 100%;
+    }
+
+    .checkin-card {
+        background: var(--color-surface);
+        border-radius: var(--radius-xl);
+        padding: var(--space-2xl);
+        box-shadow: var(--shadow-xl);
+    }
+
+    .checkin-header {
+        text-align: center;
+        margin-bottom: var(--space-xl);
+    }
+
+    .checkin-icon {
+        font-size: 4rem;
+        margin-bottom: var(--space-md);
+    }
+
+    .checkin-header h1 {
+        color: var(--color-primary);
+        margin-bottom: var(--space-sm);
+    }
+
+    .success-message {
+        background: var(--color-success-light);
+        border: 2px solid var(--color-success);
+        border-radius: var(--radius-lg);
+        padding: var(--space-xl);
+        text-align: center;
+        animation: fadeIn 0.5s;
+    }
+
+    .success-icon {
+        font-size: 4rem;
+        margin-bottom: var(--space-md);
+    }
+
+    .position-display {
+        font-size: var(--font-size-4xl);
+        font-weight: 700;
+        color: var(--color-primary);
+        margin: var(--space-lg) 0;
+    }
+
+    /* Fallback variables in case global styles fail */
+    :root {
+        --color-primary: #3b82f6;
+        --color-primary-dark: #1d4ed8;
+        --color-success: #10b981;
+        --color-text-secondary: #64748b;
+    }
+
+    .status-link {
+        display: inline-block;
+        margin-top: var(--space-lg);
+        padding: var(--space-md) var(--space-xl);
+        background-color: var(--color-primary, #3b82f6);
+        color: white !important;
+        text-decoration: none;
+        border-radius: var(--radius-md);
+        font-weight: 500;
+        transition: all var(--transition-base);
+        border: 1px solid transparent;
+    }
+
+    .checkin-page .btn-primary {
+        background-color: var(--color-primary, #3b82f6) !important;
+        color: white !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    .status-link:hover {
+        background-color: var(--color-primary-dark, #1d4ed8);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+        color: white !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="checkin-page">
+    <div class="checkin-container">
+        <div class="checkin-card">
+            <div class="checkin-header">
+                <img src="/static/logo.png" alt="Logo" style="height: 80px; margin-bottom: var(--space-md);">
+                <h1>Patient Check-In</h1>
+                <p style="color: var(--color-text-secondary);">
+                    Please fill out the form below to join the waitlist
+                </p>
+            </div>
+
+            <div id="checkinFormContainer">
+                <form id="checkinForm">
+                    <div class="form-group">
+                        <label>First Name *</label>
+                        <input type="text" id="firstName" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name *</label>
+                        <input type="text" id="lastName" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number *</label>
+                        <input type="tel" id="phone" placeholder="(555) 123-4567" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email (Optional)</label>
+                        <input type="email" id="email">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">
+                        ✅ Check In Now
+                    </button>
+                </form>
+            </div>
+
+            <div id="successContainer" style="display: none;">
+                <!-- Success message will be inserted here -->
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: var(--space-lg); color: var(--color-text-secondary);">
+            <p>You'll receive an SMS with a link to track your wait time</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('checkinForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="loading"></span> Checking in...';
+
+        const data = {
+            first_name: document.getElementById('firstName').value,
+            last_name: document.getElementById('lastName').value,
+            phone: document.getElementById('phone').value,
+            email: document.getElementById('email').value
+        };
+
+        try {
+            const result = await API.post('/api/checkin', data);
+
+            if (result.success) {
+                // Show success message
+                const token = result.entry.token;
+                const position = result.entry.position;
+                const waitTime = result.entry.estimated_wait_minutes;
+                const patientName = `${data.first_name} ${data.last_name}`;
+
+                document.getElementById('checkinFormContainer').style.display = 'none';
+                document.getElementById('successContainer').style.display = 'block';
+                document.getElementById('successContainer').innerHTML = `
+                    <div class="success-message">
+                        <div class="success-icon">✅</div>
+                        <h2>You're Checked In!</h2>
+                        <p style="margin: var(--space-md) 0; font-size: var(--font-size-lg);">
+                            Welcome, ${patientName}
+                        </p>
+                        <div class="position-display">#${position}</div>
+                        <p style="color: var(--color-text-secondary);">
+                            Your position in line
+                        </p>
+                        <p style="margin-top: var(--space-lg); font-size: var(--font-size-lg); font-weight: 500;">
+                            Estimated wait: ${formatTime(waitTime)}
+                        </p>
+                        <a href="/status/${token}" class="status-link">
+                            📱 Track Wait Time
+                        </a>
+                        <p style="margin-top: var(--space-lg); font-size: var(--font-size-sm); color: var(--color-text-secondary);">
+                            ${result.sms_sent ? '✅ SMS sent to ' + data.phone : ''}
+                        </p>
+                    </div>
+                `;
+            } else {
+                alert('❌ Error: ' + result.error);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '✅ Check In Now';
+            }
+        } catch (error) {
+            alert('❌ Error checking in. Please try again.');
+            console.error(error);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '✅ Check In Now';
+        }
+    });
+</script>
+{% endblock %}

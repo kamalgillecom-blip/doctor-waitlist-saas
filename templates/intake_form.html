@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Check-In</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --success: #10b981;
+            --bg: #f3f4f6;
+            --text: #1f2937;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .step-indicator {
+            font-size: 0.9em;
+            color: #6b7280;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        h1,
+        h2,
+        h3 {
+            margin-top: 0;
+            text-align: center;
+        }
+
+        .form-step {
+            display: none;
+            flex-direction: column;
+            gap: 20px;
+            flex: 1;
+        }
+
+        .form-step.active {
+            display: flex;
+        }
+
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-weight: 500;
+            font-size: 1.1em;
+        }
+
+        input[type="text"],
+        textarea {
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 1rem;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: opacity 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+            width: 100%;
+        }
+
+        .btn-secondary {
+            background-color: #e5e7eb;
+            color: #374151;
+            width: 100%;
+        }
+
+        .btn-success {
+            background-color: var(--success);
+            color: white;
+            width: 100%;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: auto;
+            padding-top: 20px;
+        }
+
+        #signature-pad {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            background: #fafafa;
+            touch-action: none;
+        }
+
+        .review-section {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .review-item {
+            margin-bottom: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+
+        .review-item:last-child {
+            border-bottom: none;
+        }
+
+        .review-question {
+            font-weight: 600;
+            font-size: 0.9em;
+            color: #64748b;
+        }
+
+        .review-answer {
+            font-size: 1em;
+            color: #334155;
+        }
+
+        /* PDF Generation Container (Hidden off-screen usually, but visible for library) */
+        #pdf-content {
+            position: fixed;
+            left: -9999px;
+            width: 800px;
+            /* A4 width approx */
+            background: white;
+            padding: 40px;
+            font-family: serif;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container" id="app-container">
+        <div id="loading">Loading form...</div>
+
+        <div id="wizard" style="display:none;">
+            <div class="step-indicator" id="stepIndicator">Step 1</div>
+            <h2 id="formTitle"></h2>
+            <p id="formDesc" style="text-align:center; color:#666; margin-bottom:30px;"></p>
+
+            <form id="intakeForm" onsubmit="event.preventDefault();">
+                <div id="stepsContainer"></div>
+            </form>
+        </div>
+
+        <div id="successMessage" style="display:none; text-align:center;">
+            <div style="font-size: 50px;">✅</div>
+            <h2>Check-In Complete!</h2>
+            <p>Thank you. Your forms have been securely submitted.</p>
+        </div>
+    </div>
+
+    <!-- Hidden PDF Template -->
+    <div id="pdf-content">
+        <h1 id="pdfTitle"></h1>
+        <p id="pdfDate"></p>
+        <hr>
+        <div id="pdfBody"></div>
+        <div style="margin-top:50px;">
+            <p>Signature:</p>
+            <img id="pdfSignature" style="max-width:300px; border-bottom:1px solid #000;">
+            <p id="pdfSignDate"></p>
+        </div>
+    </div>
+
+    <script>
+        const FORM_ID = {{ form_id }};
+        const API_BASE = '/api';
+        // Get patient_id from URL params
+        const urlParams = new URLSearchParams(window.location.search);
+        const PATIENT_ID = urlParams.get('patient_id') || 1; // Default for dev
+
+        let formData = null;
+        let currentStep = 0;
+        let answers = {};
+        let signaturePad = null;
+        let steps = []; // Array of field objects
+
+        document.addEventListener('DOMContentLoaded', loadForm);
+
+        async function loadForm() {
+            try {
+                const res = await fetch(`${API_BASE}/public/forms/${FORM_ID}`);
+                const data = await res.json();
+
+                if (data.success) {
+                    formData = data.form;
+                    renderWizard();
+                } else {
+                    document.getElementById('loading').innerText = 'Error loading form.';
+                }
+            } catch (e) {
+                document.getElementById('loading').innerText = 'Network error.';
+            }
+        }
+
+        function renderWizard() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('wizard').style.display = 'flex';
+            document.getElementById('wizard').style.flexDirection = 'column';
+            document.getElementById('wizard').style.flex = '1';
+
+            document.getElementById('formTitle').innerText = formData.title;
+            document.getElementById('formDesc').innerText = formData.description || '';
+
+            const container = document.getElementById('stepsContainer');
+            steps = formData.fields || [];
+
+            // Build steps HTML
+            steps.forEach((field, index) => {
+                const stepDiv = document.createElement('div');
+                stepDiv.className = 'form-step';
+                stepDiv.dataset.index = index;
+
+                let fieldHtml = '';
+                if (field.type === 'text' || field.type === 'textarea') {
+                    fieldHtml = `
+                    <label>${field.label}</label>
+                    <input type="text" name="q_${index}" class="form-control" placeholder="Your answer...">
+                `;
+                } else if (field.type === 'yesno') {
+                    fieldHtml = `
+                    <label>${field.label}</label>
+                    <div style="display:flex; gap:10px;">
+                        <label style="padding:15px; border:1px solid #ddd; border-radius:8px; flex:1; text-align:center; cursor:pointer;">
+                            <input type="radio" name="q_${index}" value="Yes"> Yes
+                        </label>
+                        <label style="padding:15px; border:1px solid #ddd; border-radius:8px; flex:1; text-align:center; cursor:pointer;">
+                            <input type="radio" name="q_${index}" value="No"> No
+                        </label>
+                    </div>
+                `;
+                } else if (field.type === 'signature') {
+                    fieldHtml = `
+                    <label>${field.label}</label>
+                    <canvas id="signature-pad" width=500 height=200></canvas>
+                    <button type="button" class="btn-secondary" onclick="signaturePad.clear()" style="margin-top:10px; width:auto;">Clear Signature</button>
+                    <input type="hidden" name="q_${index}" id="sig-input">
+                `;
+                } else if (field.type === 'header') {
+                    fieldHtml = `<h3>${field.label}</h3>`;
+                }
+
+                stepDiv.innerHTML = `
+                <div class="field-group">${fieldHtml}</div>
+                <div class="nav-buttons">
+                    ${index > 0 ? `<button type="button" class="btn-secondary" onclick="prevStep()">Back</button>` : ''}
+                    <button type="button" class="btn-primary" onclick="nextStep()">${index === steps.length - 1 ? 'Review & Sign' : 'Next'}</button>
+                </div>
+            `;
+                container.appendChild(stepDiv);
+            });
+
+            // Add Review Step
+            const reviewDiv = document.createElement('div');
+            reviewDiv.className = 'form-step';
+            reviewDiv.id = 'reviewStep';
+            reviewDiv.innerHTML = `
+            <h3>Review Your Answers</h3>
+            <div id="reviewContent"></div>
+            <div class="nav-buttons">
+                <button type="button" class="btn-secondary" onclick="prevStep()">Back</button>
+                <button type="button" class="btn-success" onclick="submitForm(this)">Submit Check-In</button>
+            </div>
+        `;
+            container.appendChild(reviewDiv);
+
+            showStep(0);
+        }
+
+        function showStep(index) {
+            document.querySelectorAll('.form-step').forEach(el => el.classList.remove('active'));
+            const stepsEls = document.querySelectorAll('.form-step');
+
+            if (index === steps.length) {
+                // Review Step
+                renderReview();
+                document.getElementById('stepIndicator').innerText = 'Review';
+                document.getElementById('reviewStep').classList.add('active');
+            } else {
+                // Regular Step
+                stepsEls[index].classList.add('active');
+                document.getElementById('stepIndicator').innerText = `Step ${index + 1} of ${steps.length}`;
+
+                // Init signature pad if visible
+                const canvas = stepsEls[index].querySelector('canvas');
+                if (canvas) {
+                    resizeCanvas(canvas);
+                    if (!signaturePad) signaturePad = new SignaturePad(canvas);
+                }
+            }
+            currentStep = index;
+        }
+
+        function nextStep() {
+            // Harvest current step data
+            if (currentStep < steps.length) {
+                const currentField = steps[currentStep];
+                if (currentField.type === 'signature') {
+                    if (signaturePad.isEmpty()) {
+                        alert('Please provide a signature.');
+                        return;
+                    }
+                    answers[`q_${currentStep}`] = signaturePad.toDataURL(); // Save base64
+                } else if (currentField.type !== 'header') {
+                    const input = document.querySelector(`[name="q_${currentStep}"]`);
+                    if (input) {
+                        if (input.type === 'radio') {
+                            const checked = document.querySelector(`[name="q_${currentStep}"]:checked`);
+                            answers[`q_${currentStep}`] = checked ? checked.value : '';
+                        } else {
+                            answers[`q_${currentStep}`] = input.value;
+                        }
+                    }
+                }
+            }
+            showStep(currentStep + 1);
+        }
+
+        function prevStep() {
+            showStep(currentStep - 1);
+        }
+
+        function renderReview() {
+            const container = document.getElementById('reviewContent');
+            container.innerHTML = steps.map((field, idx) => {
+                if (field.type === 'header') return `<h4>${field.label}</h4>`;
+                let val = answers[`q_${idx}`] || 'Not answered';
+                if (field.type === 'signature') val = '<span style="color:var(--success)">Signed</span> (Image captured)';
+                return `
+                <div class="review-item">
+                    <div class="review-question">${field.label}</div>
+                    <div class="review-answer">${val}</div>
+                </div>
+            `;
+            }).join('');
+        }
+
+        function resizeCanvas(canvas) {
+            const ratio = Math.max(window.devicePixelRatio || 1, 1);
+            canvas.width = canvas.offsetWidth * ratio;
+            canvas.height = canvas.offsetHeight * ratio;
+            canvas.getContext("2d").scale(ratio, ratio);
+        }
+
+        async function submitForm(btn) {
+            btn.disabled = true;
+            btn.innerText = 'Generating Secure Document...';
+
+            // 1. Prepare PDF Content HTML
+            document.getElementById('pdfTitle').innerText = formData.title;
+            document.getElementById('pdfDate').innerText = new Date().toLocaleDateString();
+
+            let pdfBodyHTML = '';
+            let signatureImg = null;
+
+            steps.forEach((field, idx) => {
+                if (field.type === 'header') {
+                    pdfBodyHTML += `<h3>${field.label}</h3>`;
+                } else {
+                    let val = answers[`q_${idx}`] || '';
+                    if (field.type === 'signature') {
+                        signatureImg = val; // Store for bottom
+                        val = '[Signature Provided Below]';
+                    }
+                    pdfBodyHTML += `<p><strong>${field.label}</strong><br>${val}</p>`;
+                }
+            });
+
+            document.getElementById('pdfBody').innerHTML = pdfBodyHTML;
+            if (signatureImg) {
+                document.getElementById('pdfSignature').src = signatureImg;
+                document.getElementById('pdfSignDate').innerText = 'Signed on: ' + new Date().toLocaleString();
+            } else {
+                document.getElementById('pdfSignature').style.display = 'none';
+            }
+
+            // 2. Client-side PDF Generation with jsPDF
+            // We use html2canvas to render the #pdf-content div
+            const pdfElement = document.getElementById('pdf-content');
+            pdfElement.style.position = 'absolute';
+            pdfElement.style.left = '0'; // Bring into view properly for canvas
+            pdfElement.style.zIndex = '-1'; // Keep behind
+
+            try {
+                const canvas = await html2canvas(pdfElement, { scale: 2 });
+                const imgData = canvas.toDataURL('image/jpeg', 1.0);
+
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const pageHeight = pdf.internal.pageSize.getHeight();
+
+                const widthRatio = pageWidth / canvas.width;
+                const heightRatio = (canvas.height * widthRatio > pageHeight) ? (pageHeight / canvas.height) : widthRatio;
+
+                // Just use width fit, auto height (multipage if needed logic omitted for MVP)
+                const imgWidth = pageWidth - 20; // 10mm margin
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+                pdf.addImage(imgData, 'JPEG', 10, 10, imgWidth, imgHeight);
+
+                // Get base64 string
+                const pdfBase64 = pdf.output('datauristring'); // "data:application/pdf;base64,..."
+
+                // 3. Submit to Server
+                const payload = {
+                    patient_id: PATIENT_ID,
+                    form_id: FORM_ID,
+                    answers: answers,
+                    pdf_base64: pdfBase64
+                };
+
+                const res = await fetch(`${API_BASE}/public/submissions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('wizard').style.display = 'none';
+                    document.getElementById('successMessage').style.display = 'block';
+                } else {
+                    alert('Error submitting form: ' + data.error);
+                    btn.disabled = false;
+                    btn.innerText = 'Submit Check-In';
+                }
+
+            } catch (e) {
+                console.error(e);
+                alert('Error generating PDF or submitting. Please try again.');
+                btn.disabled = false;
+            }
+        }
+    </script>
+
+</body>
+
+</html>

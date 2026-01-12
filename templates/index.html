@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Doctor Waitlist Management{% endblock %}
+
+{% block extra_css %}
+<style>
+    .landing {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, hsl(210, 100%, 95%) 0%, hsl(199, 89%, 95%) 100%);
+        padding: var(--space-lg);
+    }
+
+    .landing-container {
+        max-width: 800px;
+        text-align: center;
+    }
+
+    .landing-header {
+        margin-bottom: var(--space-2xl);
+    }
+
+    .landing-icon {
+        font-size: 6rem;
+        margin-bottom: var(--space-lg);
+    }
+
+    .landing-header h1 {
+        font-size: var(--font-size-4xl);
+        color: var(--color-primary);
+        margin-bottom: var(--space-md);
+    }
+
+    .landing-header p {
+        font-size: var(--font-size-xl);
+        color: var(--color-text-secondary);
+    }
+
+    .landing-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: var(--space-lg);
+        margin-top: var(--space-2xl);
+    }
+
+    .landing-card {
+        background: var(--color-surface);
+        border-radius: var(--radius-xl);
+        padding: var(--space-2xl);
+        box-shadow: var(--shadow-xl);
+        transition: all var(--transition-base);
+    }
+
+    .landing-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+    }
+
+    .card-icon {
+        font-size: 3rem;
+        margin-bottom: var(--space-md);
+    }
+
+    .card-title {
+        font-size: var(--font-size-xl);
+        font-weight: 600;
+        margin-bottom: var(--space-sm);
+    }
+
+    .card-description {
+        color: var(--color-text-secondary);
+        margin-bottom: var(--space-lg);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="landing">
+    <div class="landing-container">
+        <div class="landing-header">
+            <div class="landing-icon">🏥</div>
+            <h1>Doctor Waitlist Management</h1>
+            <p>Modern waitlist solution for medical practices</p>
+        </div>
+
+        <div class="landing-actions">
+            <div class="landing-card">
+                <div class="card-icon">💼</div>
+                <h3 class="card-title">Reception Dashboard</h3>
+                <p class="card-description">
+                    Manage the queue, check in patients, and track wait times
+                </p>
+                <a href="/dashboard" class="btn btn-primary btn-lg">
+                    Go to Dashboard
+                </a>
+            </div>
+
+            <div class="landing-card">
+                <div class="card-icon">📱</div>
+                <h3 class="card-title">Patient Check-In</h3>
+                <p class="card-description">
+                    Self-service check-in for patients
+                </p>
+                <a href="/checkin" class="btn btn-primary btn-lg">
+                    Check In Now
+                </a>
+            </div>
+
+            <div class="landing-card">
+                <div class="card-icon">📺</div>
+                <h3 class="card-title">Public Display</h3>
+                <p class="card-description">
+                    Waiting room display for TV or monitor
+                </p>
+                <a href="/display" target="_blank" class="btn btn-primary btn-lg">
+                    Open Display
+                </a>
+            </div>
+        </div>
+
+        <div
+            style="margin-top: var(--space-2xl); padding: var(--space-xl); background: var(--color-surface); border-radius: var(--radius-lg);">
+            <h4>Features</h4>
+            <div
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-md); margin-top: var(--space-md); text-align: left;">
+                <div>✅ SMS Notifications</div>
+                <div>✅ Queue Management</div>
+                <div>✅ Wait Time Estimates</div>
+                <div>✅ Outside Waiting Mode</div>
+                <div>✅ Real-time Updates</div>
+                <div>✅ Analytics Dashboard</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

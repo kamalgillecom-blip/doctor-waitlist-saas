@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Appointment{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/dashboard.css">
+<style>
+    .confirm-page {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    }
+
+    .confirm-card {
+        background: white;
+        border-radius: 16px;
+        padding: 40px;
+        max-width: 500px;
+        width: 100%;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    }
+
+    .confirm-icon {
+        font-size: 4rem;
+        margin-bottom: 20px;
+    }
+
+    .confirm-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+        color: #1f2937;
+    }
+
+    .confirm-subtitle {
+        color: #6b7280;
+        margin-bottom: 30px;
+    }
+
+    .appt-details {
+        background: #f9fafb;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 30px;
+        text-align: left;
+    }
+
+    .appt-detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .appt-detail-row:last-child {
+        border-bottom: none;
+    }
+
+    .appt-detail-label {
+        color: #6b7280;
+    }
+
+    .appt-detail-value {
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    .confirm-btn {
+        width: 100%;
+        padding: 16px 32px;
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .confirm-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+    }
+
+    .confirm-btn:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .success-message {
+        background: #d1fae5;
+        color: #065f46;
+        padding: 20px;
+        border-radius: 12px;
+        margin-top: 20px;
+    }
+
+    .error-message {
+        background: #fee2e2;
+        color: #991b1b;
+        padding: 20px;
+        border-radius: 12px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="confirm-page">
+    <div class="confirm-card">
+        {% if error %}
+        <div class="confirm-icon">❌</div>
+        <h1 class="confirm-title">Link Not Found</h1>
+        <p class="confirm-subtitle">This confirmation link is invalid or has expired.</p>
+        <div class="error-message">
+            Please contact the office if you need to confirm your appointment.
+        </div>
+        {% elif already_confirmed %}
+        <div class="confirm-icon">✅</div>
+        <h1 class="confirm-title">Already Confirmed!</h1>
+        <p class="confirm-subtitle">Your appointment has already been confirmed.</p>
+        <div class="appt-details">
+            <div class="appt-detail-row">
+                <span class="appt-detail-label">Patient</span>
+                <span class="appt-detail-value">{{ appointment.first_name }} {{ appointment.last_name }}</span>
+            </div>
+            <div class="appt-detail-row">
+                <span class="appt-detail-label">Date & Time</span>
+                <span class="appt-detail-value" id="apptTime">{{ appointment.appointment_time }}</span>
+            </div>
+        </div>
+        <div class="success-message">
+            ✓ We'll see you soon!
+        </div>
+
+        {% if default_form_id %}
+        <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+            <p style="margin-bottom: 15px;">Please complete your intake forms before arrival.</p>
+            <a href="/forms/{{ default_form_id }}?patient_id={{ appointment.patient_id }}" class="confirm-btn"
+                style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); text-decoration:none; display:inline-block; box-sizing:border-box;">
+                📝 Complete Check-In Forms
+            </a>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="confirm-icon">📅</div>
+        <h1 class="confirm-title">Confirm Your Appointment</h1>
+        <p class="confirm-subtitle">Hi {{ appointment.first_name }}, please confirm your upcoming appointment.</p>
+
+        <div class="appt-details">
+            <div class="appt-detail-row">
+                <span class="appt-detail-label">Patient</span>
+                <span class="appt-detail-value">{{ appointment.first_name }} {{ appointment.last_name }}</span>
+            </div>
+            <div class="appt-detail-row">
+                <span class="appt-detail-label">Date & Time</span>
+                <span class="appt-detail-value" id="apptTime">{{ appointment.appointment_time }}</span>
+            </div>
+            {% if appointment.service %}
+            <div class="appt-detail-row">
+                <span class="appt-detail-label">Service</span>
+                <span class="appt-detail-value">{{ appointment.service }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <button class="confirm-btn" id="confirmBtn" onclick="confirmAppointment()">
+            ✓ Confirm Appointment
+        </button>
+
+        <div id="successMsg" class="success-message" style="display: none;">
+            ✓ Appointment Confirmed! We'll see you soon.
+        </div>
+
+        {% if default_form_id %}
+        <div id="formsSection" style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; display: none;">
+            <p style="margin-bottom: 15px;">Please complete your intake forms before arrival.</p>
+            <a href="/forms/{{ default_form_id }}?patient_id={{ appointment.patient_id }}" class="confirm-btn"
+                style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); text-decoration:none; display:inline-block; box-sizing:border-box;">
+                📝 Complete Check-In Forms
+            </a>
+        </div>
+        {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Format the appointment time nicely
+    document.addEventListener('DOMContentLoaded', () => {
+        const timeEl = document.getElementById('apptTime');
+        if (timeEl) {
+            const date = new Date(timeEl.textContent);
+            timeEl.textContent = date.toLocaleString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+        }
+    });
+
+    async function confirmAppointment() {
+        const btn = document.getElementById('confirmBtn');
+        btn.disabled = true;
+        btn.textContent = 'Confirming...';
+
+        try {
+            const res = await fetch('/confirm/{{ token }}/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (res.ok) {
+                btn.style.display = 'none';
+                document.getElementById('successMsg').style.display = 'block';
+                const formsSec = document.getElementById('formsSection');
+                if (formsSec) formsSec.style.display = 'block';
+            } else {
+                btn.disabled = false;
+                btn.textContent = '✓ Confirm Appointment';
+                alert('Failed to confirm. Please try again.');
+            }
+        } catch (e) {
+            btn.disabled = false;
+            btn.textContent = '✓ Confirm Appointment';
+            alert('Error: ' + e.message);
+        }
+    }
+</script>
+{% endblock %}

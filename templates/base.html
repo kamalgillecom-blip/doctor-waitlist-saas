@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Doctor Waitlist{% endblock %}</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    {% if office_settings and office_settings.theme_colors %}
+    <style>
+        :root {
+            --color-primary: {
+                    {
+                    office_settings.theme_colors.primary or '#3b82f6'
+                }
+            }
+
+            ;
+            --color-primary-dark: color-mix(in srgb, var(--color-primary), black 20%);
+            --color-primary-light: color-mix(in srgb, var(--color-primary), white 90%);
+
+            --color-success: {
+                    {
+                    office_settings.theme_colors.secondary or '#10b981'
+                }
+            }
+
+            ;
+            --color-success-light: color-mix(in srgb, var(--color-success), white 90%);
+
+            --color-warning: {
+                    {
+                    office_settings.theme_colors.accent or '#f59e0b'
+                }
+            }
+
+            ;
+            --color-warning-light: color-mix(in srgb, var(--color-warning), white 90%);
+        }
+    </style>
+    {% endif %}
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    {% block content %}{% endblock %}
+
+
+    <!-- Patient Detail Modal -->
+    <div id="patientModal" class="modal-overlay" style="display: none;">
+        <div class="modal patient-modal">
+            <div class="modal-header">
+                <div>
+                    <h2 id="pmName">Patient Name</h2>
+                    <span id="pmStatus" class="badge">Status</span>
+                </div>
+                <button class="close-btn" onclick="closePatientModal()">&times;</button>
+            </div>
+
+            <div class="modal-tabs">
+                <button class="tab-btn active" onclick="switchTab('details')">Details</button>
+                <button class="tab-btn" onclick="switchTab('notes')">Notes</button>
+                <button class="tab-btn" onclick="switchTab('visits')">Visits</button>
+                <button class="tab-btn" onclick="switchTab('messages')">Messages</button>
+            </div>
+
+            <div class="modal-content">
+                <!-- Tab 1: Details -->
+                <div id="tab-details" class="tab-content active">
+                    <div class="details-grid">
+                        <div class="field-group">
+                            <label>Tags</label>
+                            <input type="text" id="pmTags" placeholder="Add tags...">
+                        </div>
+                        <div class="field-group">
+                            <label>Name</label>
+                            <input type="text" id="pmFullName">
+                        </div>
+                        <div class="field-group">
+                            <label>Phone</label>
+                            <div style="display:flex; gap:5px;">
+                                <input type="text" id="pmPhone" style="flex:2">
+                                <select id="pmPhoneType" style="flex:1">
+                                    <option value="Mobile">Mobile</option>
+                                    <option value="Home">Home</option>
+                                    <option value="Work">Work</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="field-group">
+                            <label>Email</label>
+                            <input type="email" id="pmEmail">
+                        </div>
+                        <div class="field-group">
+                            <label>State</label>
+                            <select id="pmState" disabled>
+                                <option value="waiting">Waiting</option>
+                                <option value="serving">Serving</option>
+                                <option value="completed">Completed</option>
+                            </select>
+                        </div>
+                        <div class="field-group">
+                            <label>Source</label>
+                            <input type="text" id="pmSource" readonly>
+                        </div>
+                        <div class="field-group">
+                            <label>Docks</label>
+                            <input type="text" id="pmResource" placeholder="e.g. Doc 3">
+                        </div>
+                        <div class="field-group">
+                            <label>Services</label>
+                            <input type="text" id="pmService" placeholder="e.g. Consultation">
+                        </div>
+                        <div class="field-group full-width">
+                            <label>ID</label>
+                            <input type="text" id="pmId" readonly class="mono">
+                        </div>
+                        <div class="field-group full-width">
+                            <label>Created</label>
+                            <span id="pmCreated" class="readonly-text"></span>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" style="margin-top: 20px;" onclick="savePatientDetails()">Save
+                        Changes</button>
+                </div>
+
+                <!-- Tab 2: Notes -->
+                <div id="tab-notes" class="tab-content">
+                    <div id="notesList" class="notes-list"></div>
+                    <div class="add-note">
+                        <textarea id="newNote" placeholder="Add a note..."></textarea>
+                        <button class="btn btn-sm" onclick="addNote()">Add Note</button>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Visits -->
+                <div id="tab-visits" class="tab-content">
+                    <table class="simple-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="visitsList"></tbody>
+                    </table>
+                </div>
+
+                <!-- Tab 4: Messages -->
+                <div id="tab-messages" class="tab-content">
+                    <div id="pmMessagesRaw" class="chat-container"></div>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="display: flex !important;">
+                <button class="btn btn-secondary" onclick="openAlertModalForPatient()">Alert</button>
+                <button class="btn btn-success" onclick="checkInPatient()">✓ Check In</button>
+                <button class="btn btn-danger" onclick="noShowPatient()">No Show</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Appointment Modal -->
+    <div id="appointmentModal" class="modal-overlay" style="display: none;">
+        <div class="modal appointment-modal" style="width: 500px;">
+            <div class="modal-header">
+                <h2>Add Appointment</h2>
+                <button class="close-btn" onclick="closeAppointmentModal()">&times;</button>
+            </div>
+
+            <div class="modal-content" style="padding: 20px;">
+                <!-- Book vs Block Toggle -->
+                <div
+                    style="display: flex; gap: 10px; margin-bottom: 20px; background: #f5f5f5; padding: 4px; border-radius: 8px;">
+                    <button id="btn-type-book" class="type-btn active" onclick="setApptType('book')" style="flex:1;">
+                        Book (Patient)
+                    </button>
+                    <button id="btn-type-block" class="type-btn" onclick="setApptType('block')" style="flex:1;">
+                        Block (Time)
+                    </button>
+                </div>
+
+                <form id="apptForm" onsubmit="submitAppointment(event)">
+                    <!-- TYPE: BOOK FIELDS -->
+                    <div id="type-book-fields">
+                        <div class="field-group">
+                            <label>Name <span style="color:red">*</span></label>
+                            <input type="text" id="apptName" placeholder="Ex. Walter Wait" required>
+                        </div>
+                        <div class="details-grid" style="margin-top:10px;">
+                            <div class="field-group">
+                                <label>Email</label>
+                                <input type="email" id="apptEmail" placeholder="walter@example.com">
+                            </div>
+                            <div class="field-group">
+                                <label>Phone</label>
+                                <div style="display:flex; gap:5px;">
+                                    <input type="tel" id="apptPhone" placeholder="(201) 555-0123" style="flex:2">
+                                    <select id="apptPhoneType" style="flex:1">
+                                        <option value="Mobile">Mobile</option>
+                                        <option value="Home">Home</option>
+                                        <option value="Work">Work</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COMMON FIELDS -->
+                    <div class="details-grid" style="margin-top:10px;">
+                        <div class="field-group">
+                            <label>Service</label>
+                            <input type="text" id="apptService" placeholder="Consultation">
+                        </div>
+                        <div class="field-group">
+                            <label>Queue (Doctor)</label>
+                            <select id="apptResource">
+                                <option value="">First available</option>
+                                <!-- Populated by JS -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="details-grid" style="margin-top:10px;">
+                        <div class="field-group">
+                            <label>Date</label>
+                            <input type="date" id="apptDate" required>
+                        </div>
+                        <div class="field-group">
+                            <label>Time</label>
+                            <div style="display:flex; gap:5px; align-items:center;">
+                                <input type="time" id="apptStartTime" required>
+                                <span>-</span>
+                                <input type="time" id="apptEndTime" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-group" style="margin-top:10px;">
+                        <label>Notes</label>
+                        <textarea id="apptNotes" rows="3" placeholder="Add notes here..."></textarea>
+                    </div>
+
+                    <div class="field-group" style="margin-top:10px;">
+                        <label>Tags</label>
+                        <input type="text" id="apptTags" placeholder="Add tags...">
+                    </div>
+
+                    <div
+                        style="margin-top: 20px; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
+                        <button type="button" class="btn btn-secondary"
+                            onclick="closeAppointmentModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary"
+                            style="background: #c81d6e !important; color: white !important;">Save Appointment</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* Modal Styles */
+        .patient-modal {
+            width: 800px;
+            max-width: 95vw;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            background: #f9f9f9;
+            padding: 0 20px;
+        }
+
+        .tab-btn {
+            padding: 12px 20px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-weight: 500;
+        }
+
+        .tab-btn.active {
+            border-bottom-color: var(--color-primary, #007bff);
+            color: var(--color-primary, #007bff);
+            background: white;
+        }
+
+        .modal-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .field-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .field-group label {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .field-group input,
+        .field-group select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .field-group input[readonly] {
+            background: #f5f5f5;
+        }
+
+        .full-width {
+            grid-column: span 2;
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            background: #f9f9f9;
+        }
+
+        .close-btn {
+            font-size: 1.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+
+        /* New Type Button Styles */
+        .type-btn {
+            border: none;
+            background: none;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .type-btn.active {
+            background: white;
+            color: var(--color-primary, #007bff);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .mono {
+            font-family: monospace;
+        }
+
+        .readonly-text {
+            padding: 8px 0;
+        }
+    </style>
+
+    <script>
+        let activePatientId = null;
+
+        // Tab Switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            // Find button by text content roughly or index? using event target is better usually but here we use simple mismatch
+            // Actually just select by onclick attribute for simplicity in this generated code
+            document.querySelector(`button[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+
+        // Open Modal
+        async function openPatientModal(patientId) {
+            activePatientId = patientId;
+            document.getElementById('patientModal').style.display = 'flex';
+
+            // Load Data
+            try {
+                const res = await API.get(`/api/patients/${patientId}`);
+                if (res.success) {
+                    populatePatientModal(res);
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to load patient details');
+            }
+        }
+
+        function populatePatientModal(data) {
+            const p = data.patient;
+            document.getElementById('pmName').textContent = `${p.first_name} ${p.last_name}`;
+            document.getElementById('pmFullName').value = `${p.first_name} ${p.last_name}`; // simplified name editing
+            document.getElementById('pmPhone').value = p.phone || '';
+            document.getElementById('pmPhoneType').value = p.phone_type || 'Mobile';
+            document.getElementById('pmEmail').value = p.email || '';
+            document.getElementById('pmTags').value = p.tags || '';
+            document.getElementById('pmSource').value = p.source || 'WEB-APP';
+            document.getElementById('pmId').value = p.id;
+            // Store active queue ID for actions
+            document.getElementById('pmId').dataset.queueId = data.active_queue_id || '';
+            document.getElementById('pmCreated').textContent = formatDateTime(p.created_at);
+
+            // Populate Visits
+            const visitsHtml = data.history.map(h => `<tr><td>${formatDateTime(h.checked_in_at)}</td><td>${h.appointment_id ? 'Appointment' : 'Walk-in'}</td><td>${h.duration_minutes || '-'} m</td></tr>`).join('');
+            document.getElementById('visitsList').innerHTML = visitsHtml;
+
+            // Populate Notes
+            const notesHtml = data.notes.map(n => `<div class="note-item"><small>${formatDateTime(n.created_at || n.date)}</small><p>${n.content}</p></div>`).join('');
+            document.getElementById('notesList').innerHTML = notesHtml || '<p>No notes found.</p>';
+        }
+
+        function closePatientModal() {
+            document.getElementById('patientModal').style.display = 'none';
+            activePatientId = null;
+        }
+
+        async function savePatientDetails() {
+            if (!activePatientId) return;
+
+            const names = document.getElementById('pmFullName').value.split(' ');
+            const data = {
+                first_name: names[0],
+                last_name: names.slice(1).join(' ') || '',
+                phone: document.getElementById('pmPhone').value,
+                phone_type: document.getElementById('pmPhoneType').value,
+                email: document.getElementById('pmEmail').value,
+                tags: document.getElementById('pmTags').value
+                // others...
+            };
+
+            const res = await API.put(`/api/patients/${activePatientId}`, data);
+            if (res.success) {
+                alert('Saved successfully');
+            } else {
+                alert('Error saving');
+            }
+        }
+
+        // Actions
+        async function addNote() {
+            if (!activePatientId) return;
+            const content = document.getElementById('newNote').value;
+            if (!content) return;
+
+            try {
+                const res = await API.post(`/api/patients/${activePatientId}/notes`, { content });
+                if (res.success) {
+                    document.getElementById('newNote').value = '';
+                    // Reload modal to see note
+                    openPatientModal(activePatientId);
+                } else {
+                    alert('Error adding note');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function checkInPatient() {
+            if (!activePatientId) return;
+
+            // First, check if patient has an appointment today
+            try {
+                const patientRes = await API.get(`/api/patients/${activePatientId}`);
+                if (patientRes.success && patientRes.appointments) {
+                    const today = new Date().toDateString();
+                    const todayAppt = patientRes.appointments.find(a =>
+                        new Date(a.appointment_time).toDateString() === today
+                    );
+
+                    if (todayAppt) {
+                        // Check in via appointment
+                        const res = await API.post(`/api/appointments/${todayAppt.id}/checkin`);
+                        if (res.success) {
+                            alert('Patient checked in and added to waitlist!');
+                            closePatientModal();
+                            if (window.loadQueue) window.loadQueue();
+                            if (window.loadAppointments) window.loadAppointments();
+                            return;
+                        }
+                    }
+                }
+
+                // Fallback: direct check-in without appointment
+                const queueId = document.getElementById('pmId').dataset.queueId;
+                if (queueId && queueId !== 'undefined') {
+                    const res = await API.post(`/api/queue/${queueId}/status`, { status: 'serving' });
+                    if (res.success) {
+                        closePatientModal();
+                        if (window.loadQueue) window.loadQueue();
+                        return;
+                    }
+                }
+
+                // No queue entry - offer to check in
+                if (confirm('Patient is not checked in. Check them in now?')) {
+                    const checkRes = await API.post('/api/checkin', {
+                        patient_id: activePatientId,
+                        quoted_wait_minutes: 15
+                    });
+                    if (checkRes.success) {
+                        alert('Patient checked in!');
+                        closePatientModal();
+                        if (window.loadQueue) window.loadQueue();
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Error checking in patient');
+            }
+        }
+
+        // Keep servePatient as alias for backward compatibility
+        async function servePatient() {
+            await checkInPatient();
+        }
+
+        async function noShowPatient() {
+            if (!activePatientId) return;
+            const queueId = document.getElementById('pmId').dataset.queueId;
+            if (!queueId || queueId === 'undefined') return;
+
+            if (!confirm('Mark as No Show?')) return;
+
+            try {
+                const res = await API.post(`/api/queue/${queueId}/status`, { status: 'no_show' });
+                if (res.success) {
+                    closePatientModal();
+                    if (window.loadQueue) window.loadQueue();
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function openAlertModalForPatient() {
+            if (!activePatientId) return;
+            const queueId = document.getElementById('pmId').dataset.queueId;
+            if (!queueId || queueId === 'undefined') {
+                alert('Patient must be in the queue to receive alerts.');
+                return;
+            }
+
+            // Re-use dashboard alert modal if available
+            if (window.openAlertModal) {
+                closePatientModal();
+                window.openAlertModal(queueId);
+            } else {
+                alert('Alerts feature is best used from the Dashboard.');
+            }
+        }
+
+        // Global API helper functions
+        const API = {
+            async get(url) {
+                const response = await fetch(url);
+                return response.json();
+            },
+            async post(url, data = {}) {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                return response.json();
+            },
+            async patch(url, data = {}) {
+                const response = await fetch(url, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                return response.json();
+            },
+            async put(url, data = {}) {
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                return response.json();
+            },
+            async delete(url) {
+                const response = await fetch(url, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                return response.json();
+            }
+        };
+
+        // Utility functions
+        function formatTime(minutes) {
+            if (minutes < 60) {
+                return `${Math.round(minutes)} min`;
+            }
+            const hours = Math.floor(minutes / 60);
+            const mins = Math.round(minutes % 60);
+            return `${hours}h ${mins}m`;
+        }
+
+        // Format Helper
+        function formatDateTime(isoString) {
+            if (!isoString) return '-';
+            return new Date(isoString).toLocaleString();
+        }
+
+        // ==========================================
+        // APPOINTMENT MODAL LOGIC
+        // ==========================================
+        let apptType = 'book'; // or 'block'
+
+        function setApptType(type) {
+            apptType = type;
+            // Update UI
+            document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-type-${type}`).classList.add('active');
+
+            // Toggle Fields
+            const bookFields = document.getElementById('type-book-fields');
+            if (type === 'block') {
+                bookFields.style.opacity = '0.5';
+                bookFields.style.pointerEvents = 'none';
+                document.getElementById('apptName').value = 'Blocked Time';
+                document.getElementById('apptName').required = false;
+            } else {
+                bookFields.style.opacity = '1';
+                bookFields.style.pointerEvents = 'auto';
+                if (document.getElementById('apptName').value === 'Blocked Time') {
+                    document.getElementById('apptName').value = '';
+                }
+                document.getElementById('apptName').required = true;
+            }
+        }
+
+        async function openGlobalAppointmentModal(patientId = null, patientName = null, startIso = null) {
+            // Reset Form
+            document.getElementById('apptForm').reset();
+            setApptType('book');
+
+            // Populate if provided
+            if (patientId) {
+                // We might want to store this hidden
+                document.getElementById('apptName').dataset.patientId = patientId;
+            } else {
+                delete document.getElementById('apptName').dataset.patientId;
+            }
+
+            if (patientName) document.getElementById('apptName').value = patientName;
+
+            if (startIso) {
+                const d = new Date(startIso);
+                document.getElementById('apptDate').value = d.toISOString().split('T')[0];
+                const hours = d.getHours().toString().padStart(2, '0');
+                const minutes = d.getMinutes().toString().padStart(2, '0');
+                document.getElementById('apptStartTime').value = `${hours}:${minutes}`;
+                // Default 30 min duration
+                d.setMinutes(d.getMinutes() + 30);
+                const endH = d.getHours().toString().padStart(2, '0');
+                const endM = d.getMinutes().toString().padStart(2, '0');
+                document.getElementById('apptEndTime').value = `${endH}:${endM}`;
+            } else {
+                // Default to today/now
+                const now = new Date();
+                const hours = now.getHours().toString().padStart(2, '0');
+                const minutes = now.getMinutes().toString().padStart(2, '0');
+                document.getElementById('apptDate').value = now.toISOString().split('T')[0];
+                document.getElementById('apptStartTime').value = `${hours}:${minutes}`;
+                // Add 30 mins
+                now.setMinutes(now.getMinutes() + 30);
+                const endH = now.getHours().toString().padStart(2, '0');
+                const endM = now.getMinutes().toString().padStart(2, '0');
+                document.getElementById('apptEndTime').value = `${endH}:${endM}`;
+            }
+
+            // Populate Doctors
+            try {
+                const res = await API.get('/api/doctors');
+                if (res.success) {
+                    const sel = document.getElementById('apptResource');
+                    sel.innerHTML = '<option value="">First available</option>';
+                    res.doctors.forEach(d => {
+                        const opt = document.createElement('option');
+                        opt.value = d.id;
+                        opt.textContent = `Dr. ${d.name}`;
+                        sel.appendChild(opt);
+                    });
+                }
+            } catch (e) { console.error(e); }
+
+            document.getElementById('appointmentModal').style.display = 'flex';
+        }
+
+        function closeAppointmentModal() {
+            document.getElementById('appointmentModal').style.display = 'none';
+        }
+
+        async function submitAppointment(e) {
+            e.preventDefault();
+
+            const startTimeStr = document.getElementById('apptStartTime').value;
+            const endTimeStr = document.getElementById('apptEndTime').value;
+            const dateStr = document.getElementById('apptDate').value;
+
+            // Calculate duration
+            const startD = new Date(`2000-01-01T${startTimeStr}`);
+            const endD = new Date(`2000-01-01T${endTimeStr}`);
+            let duration = (endD - startD) / 60000; // minutes
+
+            if (duration <= 0) {
+                // Maybe it crossed midnight or user error. Simple handling:
+                alert('End time must be after start time');
+                return;
+            }
+
+            const data = {
+                type: apptType,
+                appointment_time: `${dateStr}T${startTimeStr}:00`,
+                duration: duration,
+                resource: document.getElementById('apptResource').value,
+                service: document.getElementById('apptService').value,
+                notes: document.getElementById('apptNotes').value,
+                tags: document.getElementById('apptTags').value,
+
+                // Patient info
+                patient_id: document.getElementById('apptName').dataset.patientId,
+                name: document.getElementById('apptName').value,
+                email: document.getElementById('apptEmail').value,
+                phone: document.getElementById('apptPhone').value,
+                phone_type: document.getElementById('apptPhoneType').value
+            };
+
+            try {
+                const res = await API.post('/api/appointments', data);
+                if (res.success) {
+                    closeAppointmentModal();
+                    // Refresh calendar if on calendar page
+                    if (window.loadAppointments) window.loadAppointments();
+                    // Refresh dashboard if needed
+                    if (window.loadQueue) window.loadQueue();
+                    alert('Appointment Saved!');
+                } else {
+                    alert('Error: ' + res.error);
+                }
+            } catch (e) {
+                alert('System error: ' + e.message);
+            }
+        }
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

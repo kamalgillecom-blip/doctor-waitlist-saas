@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}Waiting Room Display{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Fallback variables */
+    :root {
+        --color-primary: #3b82f6;
+        --color-primary-dark: #1d4ed8;
+        --color-success: #10b981;
+    }
+
+    body {
+        margin: 0;
+        overflow: hidden;
+    }
+
+    .display-page {
+        min-height: 100vh;
+        background: linear-gradient(135deg, hsl(220, 20%, 12%) 0%, hsl(220, 30%, 18%) 100%);
+        color: white;
+        padding: var(--space-xl);
+    }
+
+    .display-header {
+        text-align: center;
+        margin-bottom: var(--space-2xl);
+        padding-bottom: var(--space-xl);
+        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .display-header h1 {
+        font-size: var(--font-size-4xl);
+        color: white;
+        margin-bottom: var(--space-sm);
+    }
+
+    .display-header .subtitle {
+        font-size: var(--font-size-xl);
+        opacity: 0.7;
+    }
+
+    .now-serving {
+        background: linear-gradient(135deg, var(--color-primary) 0%, hsl(210, 100%, 40%) 100%);
+        border-radius: var(--radius-xl);
+        padding: var(--space-2xl);
+        margin-bottom: var(--space-2xl);
+        text-align: center;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .now-serving-label {
+        font-size: var(--font-size-lg);
+        opacity: 0.9;
+        margin-bottom: var(--space-md);
+    }
+
+    .now-serving-number {
+        font-size: 8rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .queue-display {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: var(--space-lg);
+    }
+
+    .queue-display-item {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: var(--radius-lg);
+        padding: var(--space-xl);
+        text-align: center;
+        transition: all var(--transition-base);
+    }
+
+    .queue-display-item:hover {
+        background: rgba(255, 255, 255, 0.08);
+        transform: translateY(-4px);
+    }
+
+    .display-position {
+        font-size: var(--font-size-4xl);
+        font-weight: 700;
+        color: var(--color-primary);
+        line-height: 1;
+        margin-bottom: var(--space-md);
+    }
+
+    .display-wait {
+        font-size: var(--font-size-lg);
+        opacity: 0.8;
+    }
+
+    .empty-state-display {
+        text-align: center;
+        padding: var(--space-2xl);
+        opacity: 0.5;
+    }
+
+    .empty-state-display-icon {
+        font-size: 6rem;
+        margin-bottom: var(--space-lg);
+    }
+
+    .clock {
+        position: fixed;
+        top: var(--space-lg);
+        right: var(--space-lg);
+        font-size: var(--font-size-2xl);
+        font-weight: 300;
+        opacity: 0.7;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="display-page">
+    <div class="clock" id="clock"></div>
+
+    <div class="display-header">
+        <img src="/static/logo.png" alt="Logo" style="height: 100px; margin-bottom: var(--space-md);">
+        <h1>Dr. Smith's Office</h1>
+        <div class="subtitle">Current Waitlist</div>
+    </div>
+
+    <div id="displayContent">
+        <div class="empty-state-display">
+            <div class="empty-state-display-icon">⏳</div>
+            <p style="font-size: var(--font-size-xl);">Loading waitlist...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Update clock
+    function updateClock() {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        document.getElementById('clock').textContent = timeStr;
+    }
+
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // Load queue
+    async function loadQueue() {
+        try {
+            const result = await API.get('/api/queue');
+
+            if (result.success) {
+                renderQueue(result.queue);
+            }
+        } catch (error) {
+            console.error('Error loading queue:', error);
+        }
+    }
+
+    function renderQueue(queue) {
+        const container = document.getElementById('displayContent');
+
+        if (queue.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state-display">
+                    <div class="empty-state-display-icon">✨</div>
+                    <p style="font-size: var(--font-size-2xl);">No patients waiting</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Show now serving (first patient)
+        const nowServing = queue[0];
+
+        let html = `
+            <div class="now-serving">
+                <div class="now-serving-label">NOW SERVING</div>
+                <div class="now-serving-number">#${nowServing.position}</div>
+            </div>
+        `;
+
+        // Show remaining queue if more than 1 patient
+        if (queue.length > 1) {
+            html += '<div class="queue-display">';
+
+            for (let i = 1; i < Math.min(queue.length, 9); i++) {
+                const entry = queue[i];
+                html += `
+                    <div class="queue-display-item fade-in">
+                        <div class="display-position">#${entry.position}</div>
+                        <div class="display-wait">~${formatTime(entry.estimated_wait_minutes)}</div>
+                    </div>
+                `;
+            }
+
+            html += '</div>';
+
+            if (queue.length > 9) {
+                html += `
+                    <p style="text-align: center; margin-top: var(--space-xl); opacity: 0.6; font-size: var(--font-size-lg);">
+                        +${queue.length - 9} more waiting
+                    </p>
+                `;
+            }
+        }
+
+        container.innerHTML = html;
+    }
+
+    // Load on page load and refresh every 15 seconds
+    document.addEventListener('DOMContentLoaded', () => {
+        loadQueue();
+        setInterval(loadQueue, 15000);
+    });
+</script>
+{% endblock %}

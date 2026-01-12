@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block title %}Wait Status{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Fallback variables */
+    :root {
+        --color-primary: #3b82f6;
+        --color-bg: #f3f4f6;
+        --color-surface: #ffffff;
+        --color-text: #1f2937;
+        --color-text-secondary: #6b7280;
+    }
+
+    .status-page {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--space-lg);
+        background: linear-gradient(135deg, hsl(210, 100%, 95%) 0%, hsl(199, 89%, 95%) 100%);
+    }
+
+    .status-container {
+        max-width: 600px;
+        width: 100%;
+    }
+
+    .status-card {
+        background: var(--color-surface);
+        border-radius: var(--radius-xl);
+        padding: var(--space-2xl);
+        box-shadow: var(--shadow-xl);
+        text-align: center;
+    }
+
+    .status-header {
+        margin-bottom: var(--space-xl);
+    }
+
+    .patient-greeting {
+        font-size: var(--font-size-2xl);
+        font-weight: 600;
+        color: var(--color-text);
+        margin-bottom: var(--space-sm);
+    }
+
+    .position-circle {
+        width: 200px;
+        height: 200px;
+        margin: var(--space-xl) auto;
+        background: linear-gradient(135deg, var(--color-primary) 0%, hsl(199, 89%, 48%) 100%);
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        box-shadow: var(--shadow-xl);
+        position: relative;
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    .position-number {
+        font-size: 5rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .position-label {
+        font-size: var(--font-size-sm);
+        opacity: 0.9;
+        margin-top: var(--space-xs);
+    }
+
+    .wait-info {
+        margin: var(--space-xl) 0;
+    }
+
+    .wait-time {
+        font-size: var(--font-size-3xl);
+        font-weight: 700;
+        color: var(--color-primary);
+        margin-bottom: var(--space-sm);
+    }
+
+    .patients-ahead {
+        font-size: var(--font-size-lg);
+        color: var(--color-text-secondary);
+    }
+
+    .waiting-outside-section {
+        margin: var(--space-xl) 0;
+        padding: var(--space-xl);
+        background: var(--color-bg);
+        border-radius: var(--radius-lg);
+    }
+
+    .waiting-outside-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-md);
+    }
+
+    .toggle-switch {
+        position: relative;
+        width: 60px;
+        height: 34px;
+    }
+
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--color-border);
+        transition: var(--transition-base);
+        border-radius: var(--radius-full);
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: var(--transition-base);
+        border-radius: 50%;
+    }
+
+    input:checked+.slider {
+        background-color: var(--color-primary);
+    }
+
+    input:checked+.slider:before {
+        transform: translateX(26px);
+    }
+
+    .notification-alert {
+        background: var(--color-info-light);
+        border: 2px solid var(--color-info);
+        border-radius: var(--radius-lg);
+        padding: var(--space-lg);
+        margin-top: var(--space-lg);
+        animation: fadeIn 0.5s;
+    }
+
+    .ready-alert {
+        background: var(--color-success-light);
+        border: 2px solid var(--color-success);
+        border-radius: var(--radius-lg);
+        padding: var(--space-xl);
+        margin-bottom: var(--space-lg);
+        font-size: var(--font-size-xl);
+        font-weight: 600;
+        color: hsl(142, 71%, 30%);
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    .last-updated {
+        margin-top: var(--space-xl);
+        font-size: var(--font-size-sm);
+        color: var(--color-text-tertiary);
+    }
+
+    .toggle-label {
+        font-weight: 500;
+        color: var(--color-text-secondary);
+        transition: color 0.3s;
+    }
+
+    .toggle-label.active {
+        color: var(--color-primary);
+        font-weight: 700;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="status-page">
+    <div class="status-container">
+        <div id="statusContent">
+            <div class="status-card">
+                <div class="empty-state">
+                    <div class="empty-state-icon">⏳</div>
+                    <p>Loading your status...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const token = "{{ token }}";
+    let currentStatus = null;
+    let waitingOutside = false;
+    let steppingOut = false;
+
+    // Load status on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadStatus();
+
+        // Auto-refresh every 15 seconds
+        setInterval(loadStatus, 15000);
+    });
+
+    async function loadStatus() {
+        try {
+            const result = await API.get(`/api/status/${token}`);
+
+            if (result.success) {
+                currentStatus = result.entry;
+                waitingOutside = currentStatus.waiting_outside == 1;
+                renderStatus();
+            } else {
+                showError('Unable to find your check-in. Please contact reception.');
+            }
+        } catch (error) {
+            console.error('Error loading status:', error);
+            showError('Error loading status. Please refresh the page.');
+        }
+    }
+
+    function renderStatus() {
+        const position = currentStatus.position;
+        const patientsAhead = currentStatus.patients_ahead;
+        const waitTime = currentStatus.estimated_wait_minutes;
+        const name = `${currentStatus.first_name} ${currentStatus.last_name}`;
+
+        const isReady = position === 1;
+
+        document.getElementById('statusContent').innerHTML = `
+            ${isReady ? `
+                <div class="ready-alert">
+                    🎉 You're next! Please come in now.
+                </div>
+            ` : ''}
+            
+            <div class="status-card">
+                <div class="status-header">
+                    <img src="/static/logo.png" alt="Logo" style="height: 60px; margin-bottom: var(--space-md);">
+                    <div class="patient-greeting">Hi, ${name}! 👋</div>
+                    <p style="color: var(--color-text-secondary);">
+                        Here's your current wait status
+                    </p>
+                </div>
+                
+                <div class="position-circle">
+                    <div class="position-number">#${position}</div>
+                    <div class="position-label">Your Position</div>
+                </div>
+                
+                <div class="wait-info">
+                    <div class="wait-time">${formatTime(waitTime)}</div>
+                    <div class="patients-ahead">
+                        ${patientsAhead === 0 ?
+                "You're next!" :
+                `${patientsAhead} patient${patientsAhead > 1 ? 's' : ''} ahead of you`
+            }
+                    </div>
+                </div>
+                
+                <div class="waiting-outside-section">
+                    <h4 style="margin-bottom: var(--space-md);">Waiting Outside?</h4>
+                    <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-md);">
+                        Toggle this on to receive a text when it's almost your turn
+                    </p>
+                    <div class="waiting-outside-toggle">
+                        <span class="toggle-label ${!waitingOutside ? 'active' : ''}">🪑 Inside</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="outsideToggle" 
+                                   ${waitingOutside ? 'checked' : ''} 
+                                   onchange="toggleWaitingOutside()">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="toggle-label ${waitingOutside ? 'active' : ''}">🚗 Outside</span>
+                    </div>
+                    ${waitingOutside ? `
+                        <div class="notification-alert">
+                            📱 We'll text you when it's almost your turn!
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <div class="stepping-out-section" style="margin-top: var(--space-lg); padding: var(--space-lg); background: linear-gradient(135deg, #f3e8ff 0%, #fae8ff 100%); border-radius: var(--radius-lg); border: 2px solid #a855f7;">
+                    <h4 style="margin-bottom: var(--space-md); color: #7c3aed;">🚶 Need to Step Out?</h4>
+                    <p style="font-size: var(--font-size-sm); color: #6b7280; margin-bottom: var(--space-md);">
+                        Let us know if you need to briefly leave. We'll remind you 15 minutes before your turn.
+                    </p>
+                    <button class="stepping-out-btn ${steppingOut ? 'active' : ''}" onclick="toggleSteppingOut()">
+                        ${steppingOut ? '✓ Stepped Out - We will remind you!' : '🚶 I\'m Stepping Out'}
+                    </button>
+                    ${steppingOut ? `
+                        <div class="stepping-out-alert" style="margin-top: var(--space-md); padding: var(--space-md); background: white; border-radius: var(--radius-md); color: #7c3aed; font-weight: 500; text-align: center;">
+                            ⏰ Don't go too far! Your turn is approximately <strong>${waitTime} minutes</strong> away.
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <div class="last-updated">
+                    Auto-refreshes every 15 seconds • Last updated: ${new Date().toLocaleTimeString()}
+                </div>
+            </div>
+        `;
+    }
+
+    async function toggleWaitingOutside() {
+        const isChecked = document.getElementById('outsideToggle').checked;
+
+        try {
+            const result = await API.post(`/api/status/${token}/outside`, {
+                waiting_outside: isChecked
+            });
+
+            if (result.success) {
+                waitingOutside = isChecked;
+                renderStatus();
+            }
+        } catch (error) {
+            console.error('Error toggling outside status:', error);
+            alert('Error updating status. Please try again.');
+            // Revert checkbox
+            document.getElementById('outsideToggle').checked = !isChecked;
+        }
+    }
+
+    async function toggleSteppingOut() {
+        const newValue = !steppingOut;
+        const waitTime = currentStatus ? currentStatus.estimated_wait_minutes : 15;
+
+        if (newValue) {
+            // Show warning when stepping out
+            alert(`⏰ Don't go too far!\n\nYour appointment is approximately ${waitTime} minutes away.\n\nWe'll send you an SMS reminder 15 minutes before your turn.`);
+        }
+
+        try {
+            // Note: In a full implementation, this would call an API to mark stepping_out
+            // For now, we'll update locally and use the waiting_outside endpoint
+            const result = await API.post(`/api/status/${token}/outside`, {
+                waiting_outside: newValue
+            });
+
+            if (result.success) {
+                steppingOut = newValue;
+                waitingOutside = newValue; // Sync with waiting outside
+                renderStatus();
+            }
+        } catch (error) {
+            console.error('Error toggling stepping out:', error);
+            alert('Error updating status. Please try again.');
+        }
+    }
+
+    function showError(message) {
+        document.getElementById('statusContent').innerHTML = `
+            <div class="status-card">
+                <div class="empty-state">
+                    <div class="empty-state-icon">❌</div>
+                    <p>${message}</p>
+                </div>
+            </div>
+        `;
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,1181 @@
+{% extends "base.html" %}
+
+{% block title %}Enhanced Reception Dashboard{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/dashboard.css">
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-layout">
+    <!-- Left Sidebar Navigation -->
+    <div class="sidebar">
+        <div class="sidebar-nav">
+            <a href="/dashboard" class="sidebar-item active" title="Dashboard">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
+                </svg>
+            </a>
+            <a href="/messages" class="sidebar-item" title="Messages">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                        d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z" />
+                </svg>
+                <span class="sidebar-badge" id="messagesBadge" style="display: none;">0</span>
+            </a>
+            <a href="/calendar" class="sidebar-item" title="Calendar">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                        d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z" />
+                </svg>
+            </a>
+            <a href="/customers" class="sidebar-item" title="Customers">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                        d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+                </svg>
+            </a>
+            <a href="/settings" class="sidebar-item" title="Settings">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                        d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
+                </svg>
+            </a>
+            <a href="#" class="sidebar-item" onclick="showAnalytics(); return false;" title="Analytics">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z" />
+                </svg>
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Content -->
+    <div class="dashboard-content">
+        <div class="content-header"
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-lg);">
+            <a href="/dashboard">
+                <img src="/static/logo.png" alt="MeNext.ca" style="height: 50px;">
+            </a>
+            <select id="providerFilter" class="form-control" style="display:none; width: 220px;" onchange="loadQueue()">
+                <option value="">All Providers</option>
+            </select>
+        </div>
+
+        <!-- Main Dashboard Grid -->
+        <div class="dashboard-grid">
+            <!-- Left Section: Appointments + Waiting -->
+            <div class="left-columns">
+                <!-- Column 1: Today's Appointments -->
+                <div class="column">
+                    <div class="column-header">
+                        <h3 class="column-title" style="justify-content: center;">
+                            Appointments
+                            <span class="column-count" id="appointmentsCount">0</span>
+                        </h3>
+                    </div>
+                    <div class="column-body" id="appointmentsColumn">
+                        <div class="column-empty">
+                            <div class="column-empty-icon">📅</div>
+                            <p>No appointments today</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column 2: Active Waitlist -->
+                <div class="column">
+                    <div class="column-header">
+                        <h3 class="column-title" style="justify-content: center;">
+                            Waiting
+                            <span class="column-count" id="waitingCount">0</span>
+                        </h3>
+                    </div>
+                    <div class="column-body" id="waitingColumn">
+                        <div class="column-empty">
+                            <div class="column-empty-icon">⏳</div>
+                            <p>No patients waiting</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Section: Rooms Grid -->
+            <div class="rooms-section">
+                <div class="rooms-header">
+                    <h3 class="column-title" style="justify-content: center;">
+                        Rooms
+                        <span class="column-count" id="roomsOccupied">0</span>
+                    </h3>
+                    <button class="btn btn-sm" onclick="addRoom()" title="Add Room">+ Add Room</button>
+                </div>
+                <div class="rooms-grid" id="roomsGrid">
+                    <!-- Rooms will be loaded dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom: Completed Today -->
+        <div class="completed-section">
+            <div class="completed-header">
+                <h3 class="column-title" style="justify-content: center;">
+                    Completed Today
+                    <span class="column-count" id="completedCount">0</span>
+                </h3>
+            </div>
+            <div class="completed-scroll" id="completedColumn">
+                <!-- Completed patients will be loaded here horizontally -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alert Modal -->
+<div id="alertModal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Send Alert to Patient</h3>
+            <p style="color: var(--color-text-secondary); margin: 0;">
+                Patient: <strong id="alertPatientName"></strong>
+            </p>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Select Alert Template</label>
+                <select id="alertTemplateSelect" class="form-control">
+                    <option value="">Loading templates...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Preview</label>
+                <div id="alertPreview"
+                    style="padding: var(--space-md); background: var(--color-bg); border-radius: var(--radius-md); min-height: 60px; color: var(--color-text-secondary);">
+                    Select a template to see preview
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeAlertModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="sendAlert()">Send Alert</button>
+        </div>
+    </div>
+</div>
+
+<!-- New Message Popup -->
+<div id="messagePopup" class="message-popup" style="display: none;">
+    <div class="message-popup-content">
+        <span class="message-popup-close" onclick="closeMessagePopup()">&times;</span>
+        <h4>📩 New Message</h4>
+        <p id="messagePopupText"></p>
+        <button class="btn btn-sm btn-primary" onclick="viewMessages()">View Messages</button>
+    </div>
+</div>
+
+<style>
+    .message-popup {
+        position: fixed;
+        bottom: var(--space-xl);
+        right: var(--space-xl);
+        z-index: 999;
+        animation: fadeIn 0.3s;
+    }
+
+    .message-popup-content {
+        background: var(--color-surface);
+        padding: var(--space-lg);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-xl);
+        min-width: 300px;
+        border-left: 4px solid var(--color-primary);
+    }
+
+    .message-popup-close {
+        position: absolute;
+        top: var(--space-sm);
+        right: var(--space-sm);
+        font-size: var(--font-size-xl);
+        cursor: pointer;
+        color: var(--color-text-tertiary);
+    }
+
+    .message-popup-close:hover {
+        color: var(--color-text);
+    }
+
+    .message-popup h4 {
+        margin: 0 0 var(--space-sm) 0;
+    }
+
+    /* Centered Column Titles */
+    .column-title {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+        flex: 1;
+    }
+
+    /* Outline Button Styles */
+    .btn-outline-primary {
+        background: transparent;
+        border: 1px solid var(--color-primary);
+        color: var(--color-primary);
+    }
+
+    .btn-outline-primary:hover {
+        background: var(--color-primary-light);
+    }
+
+    .btn-outline-success {
+        background: transparent;
+        border: 1px solid var(--color-success);
+        color: var(--color-success);
+    }
+
+    .btn-outline-success:hover {
+        background: var(--color-success-light);
+    }
+</style>
+<!-- Room Edit Modal -->
+<div id="roomModal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="roomModalTitle">Edit Room</h3>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="roomModalId">
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" id="roomNameInput" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>Color</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="color" id="roomColorInput" class="form-control"
+                        style="width: 60px; height: 40px; padding: 0;" value="#ffffff">
+                    <span style="font-size: 0.9em; color: var(--color-text-secondary);">Pick a highlight color</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Opacity (<span id="opacityValue">100%</span>)</label>
+                <input type="range" id="roomOpacityInput" min="0" max="1" step="0.1" value="1" style="width: 100%;"
+                    oninput="document.getElementById('opacityValue').textContent = Math.round(this.value * 100) + '%'">
+            </div>
+            <div class="form-group">
+                <label>Assigned Provider</label>
+                <select id="roomDoctorSelect" class="form-control">
+                    <option value="">All Providers</option>
+                </select>
+                <small style="color: var(--color-text-secondary);">If selected, this room will only appear when
+                    filtering for this provider.</small>
+            </div>
+
+            <div class="form-group">
+                <label>Preview</label>
+                <div id="roomPreviewBox" class="room-box"
+                    style="display: flex; align-items: center; justify-content: center; min-height: 80px; border: 2px solid var(--color-border);">
+                    <span style="font-weight: bold;">Room Name</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeRoomModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveRoom()"
+            style="background-color: #3b82f6; color: white;">Save</button>
+    </div>
+</div>
+</div>
+
+<!-- Generic Web Modal (Replaces System Alert/Confirm) -->
+<div id="webModal" class="modal-overlay" style="display: none; z-index: 2000;">
+    <div class="modal" style="max-width: 450px;">
+        <div class="modal-header">
+            <h3 id="webModalTitle">Notification</h3>
+        </div>
+        <div class="modal-body">
+            <p id="webModalMessage" style="white-space: pre-wrap; color: var(--color-text); font-size: 1.1em;"></p>
+        </div>
+        <div class="modal-actions" id="webModalActions">
+            <!-- Buttons injected by JS -->
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentAlertEntry = null;
+    let alertTemplates = [];
+    let lastMessageCheck = 0;
+    let availableDoctors = [];
+
+    // Load data on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadDoctorsForFilter();
+        loadAllColumns();
+        loadAlertTemplates();
+        checkUnreadMessages();
+
+        // Auto-refresh every 15 seconds
+        setInterval(loadAllColumns, 15000);
+
+        // Check for new messages every 10 seconds
+        setInterval(checkNewMessages, 10000);
+    });
+
+    // Fetch doctors for filter
+    function loadDoctorsForFilter() {
+        API.get('/api/doctors').then(res => {
+            if (res.success && res.doctors.length > 0) {
+                const sel = document.getElementById('providerFilter');
+                if (sel) {
+                    sel.style.display = 'block';
+                    availableDoctors = res.doctors; // Store for room modal
+                    res.doctors.forEach(d => {
+                        const opt = document.createElement('option');
+                        opt.value = d.id;
+                        opt.textContent = `For: ${d.name}`;
+                        sel.appendChild(opt);
+                    });
+                }
+            }
+        });
+    }
+
+    // Load all columns
+    async function loadAllColumns() {
+        await Promise.all([
+            loadAppointments(),
+            loadWaitingQueue(),
+            loadRooms(),
+            loadCompletedQueue()
+        ]);
+    }
+
+    function getProviderFilter() {
+        const sel = document.getElementById('providerFilter');
+        return sel ? sel.value : '';
+    }
+
+    // Load waiting queue
+    async function loadWaitingQueue() {
+        try {
+            const providerId = getProviderFilter();
+            const result = await API.get(`/api/queue/by-status/waiting?doctor_id=${providerId}`);
+            if (result.success) {
+                renderColumn('waitingColumn', result.entries, 'waiting');
+                document.getElementById('waitingCount').textContent = result.entries.length;
+            }
+        } catch (error) {
+            console.error('Error loading waiting queue:', error);
+        }
+    }
+
+    // Load rooms with occupants
+    async function loadRooms() {
+        try {
+            const result = await API.get('/api/rooms');
+            if (result.success) {
+                renderRooms(result.rooms);
+                // Count rooms with at least one occupant
+                const occupied = result.rooms.filter(r => r.occupants && r.occupants.length > 0).length;
+                document.getElementById('roomsOccupied').textContent = `${occupied}/${result.rooms.length}`;
+            }
+        } catch (error) {
+            console.error('Error loading rooms:', error);
+        }
+    }
+
+    // Render rooms grid
+    function renderRooms(rooms) {
+        const container = document.getElementById('roomsGrid');
+
+        if (rooms.length === 0) {
+            container.innerHTML = `
+                <div class="room-empty-text">
+                    <p>No rooms configured. Click "Add Room" to create rooms.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const providerId = getProviderFilter();
+
+        // Filter rooms: Show if "All Providers" (null/empty filter) OR Room is Unassigned OR Room matches Filter
+        // User request: "when that provider is selected only those rooms should show, have option for room to be all provider as well"
+        // Interpretation: If I select Dr House, show Dr House Rooms AND Shared Rooms.
+        const visibleRooms = rooms.filter(r => {
+            if (!providerId) return true; // All rooms visible when no filter
+            return !r.doctor_id || r.doctor_id == providerId;
+        });
+
+        if (visibleRooms.length === 0) {
+            container.innerHTML = `
+                <div class="room-empty-text">
+                    <p>No rooms available for this selection.</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = visibleRooms.map(room => {
+            const occupants = room.occupants || [];
+
+            // Calculate background color with opacity
+            const bgColor = room.color ? hexToRgba(room.color, room.opacity || 1.0) : '';
+            const style = bgColor ? `style="background-color: ${bgColor}; border-color: ${room.color};"` : '';
+
+            // Build occupants HTML
+            const occupantsHtml = occupants.map(occupant => {
+                const statusClasses = [];
+                if (occupant.vitals_taken) statusClasses.push('status-vitals');
+                if (occupant.dr_visited) statusClasses.push('status-dr-visited');
+                if (occupant.waiting_rx) statusClasses.push('status-waiting-rx');
+                if (occupant.custom_status) statusClasses.push('status-custom');
+
+                const timeInRoom = occupant.room_entered_at
+                    ? getTimeElapsed(occupant.room_entered_at)
+                    : '';
+
+                return `
+                    <div class="room-patient-card ${statusClasses.join(' ')}">
+                        <div class="room-patient-header">
+                            <span class="room-patient-name">${occupant.first_name} ${occupant.last_name}</span>
+                            <span class="room-timer">${timeInRoom}</span>
+                        </div>
+                        
+                        <div class="room-status-flags">
+                            <label class="status-flag vitals ${occupant.vitals_taken ? 'active' : ''}" 
+                                   onclick="toggleRoomStatus(${occupant.id}, 'vitals_taken', ${!occupant.vitals_taken}); event.stopPropagation();">
+                                🩺
+                            </label>
+                            <label class="status-flag dr-visited ${occupant.dr_visited ? 'active' : ''}"
+                                   onclick="toggleRoomStatus(${occupant.id}, 'dr_visited', ${!occupant.dr_visited}); event.stopPropagation();">
+                                👨‍⚕️
+                            </label>
+                            <label class="status-flag waiting-rx ${occupant.waiting_rx ? 'active' : ''}"
+                                   onclick="toggleRoomStatus(${occupant.id}, 'waiting_rx', ${!occupant.waiting_rx}); event.stopPropagation();">
+                                💊
+                            </label>
+                        </div>
+                        
+                        <div class="room-actions-row">
+                            <button class="btn btn-xs btn-success" onclick="completeFromRoom(${occupant.id}); event.stopPropagation();">✅</button>
+                            <button class="btn btn-xs btn-secondary" onclick="returnToWaiting(${occupant.id}); event.stopPropagation();">↩️</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="room-box ${occupants.length > 0 ? '' : 'empty'}" 
+                     data-room-id="${room.id}"
+                     ${style}
+                     ondragover="handleDragOver(event)"
+                     ondragleave="handleDragLeave(event)"
+                     ondrop="handleDrop(event, ${room.id})">
+                    <div class="room-box-header">
+                        <span class="room-name">${room.name}</span>
+                        <div class="room-header-actions">
+                            <span class="room-count badge">${occupants.length}</span>
+                            <button class="btn-icon-secondary" onclick="openRoomModal(${room.id}, '${room.name}', '${room.color || '#ffffff'}', ${room.opacity || 1.0}, ${room.doctor_id})" title="Edit Room">✎</button>
+                            <button class="btn-icon-danger" onclick="deleteRoom(${room.id}, '${room.name}')" title="Delete Room">×</button>
+                        </div>
+                    </div>
+                    
+                    <div class="room-patients-list">
+                        ${occupants.length > 0 ? occupantsHtml : '<div class="room-empty-text" style="color: #9ca3af; text-align: center; padding: 10px; font-style: italic;">Drop patient here</div>'}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Helper: HEX to RGBA
+    function hexToRgba(hex, alpha) {
+        if (!hex) return '';
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    // Room Modal Functions
+    function updateRoomPreview() {
+        const color = document.getElementById('roomColorInput').value;
+        const opacity = document.getElementById('roomOpacityInput').value;
+        const box = document.getElementById('roomPreviewBox');
+
+        const rgba = hexToRgba(color, opacity);
+        box.style.backgroundColor = rgba;
+        box.style.borderColor = color;
+    }
+
+    // Attach listeners
+    document.getElementById('roomColorInput').oninput = updateRoomPreview;
+    document.getElementById('roomOpacityInput').oninput = function () {
+        document.getElementById('opacityValue').textContent = Math.round(this.value * 100) + '%';
+        updateRoomPreview();
+    };
+
+    function openRoomModal(roomId, name, color, opacity, doctorId) {
+        const isEdit = !!roomId;
+        document.getElementById('roomModalTitle').textContent = isEdit ? 'Edit Room' : 'Add New Room';
+        document.getElementById('roomModalId').value = roomId || '';
+        document.getElementById('roomNameInput').value = name || '';
+        document.getElementById('roomColorInput').value = color || '#ffffff';
+        document.getElementById('roomOpacityInput').value = opacity !== undefined ? opacity : 1.0;
+        document.getElementById('opacityValue').textContent = Math.round((opacity !== undefined ? opacity : 1.0) * 100) + '%';
+
+        // Populate doctors
+        const docSelect = document.getElementById('roomDoctorSelect');
+        docSelect.innerHTML = '<option value="">All Providers</option>';
+        availableDoctors.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.id;
+            opt.textContent = d.name;
+            if (doctorId && d.id == doctorId) opt.selected = true;
+            docSelect.appendChild(opt);
+        });
+
+        updateRoomPreview(); // Init preview
+        document.getElementById('roomModal').style.display = 'flex';
+    }
+
+    function closeRoomModal() {
+        document.getElementById('roomModal').style.display = 'none';
+    }
+
+    async function saveRoom() {
+        const id = document.getElementById('roomModalId').value;
+        const name = document.getElementById('roomNameInput').value;
+        const color = document.getElementById('roomColorInput').value;
+        const opacity = document.getElementById('roomOpacityInput').value;
+        const doctorId = document.getElementById('roomDoctorSelect').value;
+
+        if (!name) return webAlert('Error', 'Room name is required');
+
+        const payload = {
+            name,
+            color,
+            opacity: parseFloat(opacity),
+            doctor_id: doctorId || null
+        };
+
+        try {
+            let result;
+            if (id) {
+                result = await API.put(`/api/rooms/${id}`, payload);
+            } else {
+                result = await API.post('/api/rooms', payload);
+            }
+
+            if (result.success) {
+                closeRoomModal();
+                loadRooms();
+            } else {
+                webAlert('Error', 'Error saving room: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error saving room:', error);
+            webAlert('Error', 'Failed to save room');
+        }
+    }
+
+    // Add new room logic override
+    function addRoom() {
+        openRoomModal(null, '', '#ffffff', 1.0, null);
+    }
+
+    // Remove old editRoom function (replaced by openRoomModal)
+
+    // Delete Room
+    async function deleteRoom(roomId, roomName) {
+        webConfirm(`Delete Room`, `Are you sure you want to delete "${roomName}"?`, async () => {
+            try {
+                const result = await API.delete(`/api/rooms/${roomId}`);
+                if (result.success) {
+                    loadAllColumns();
+                } else {
+                    webAlert('Error', 'Error deleting room: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error deleting room:', error);
+                webAlert('Error', 'Failed to delete room');
+            }
+        });
+    }
+
+    // Get time elapsed in human readable format
+    function getTimeElapsed(startTime) {
+        const start = new Date(startTime);
+        const now = new Date();
+        const diffMs = now - start;
+        const diffMins = Math.floor(diffMs / 60000);
+
+        if (diffMins < 1) return '<1m';
+        if (diffMins < 60) return `${diffMins}m`;
+        const hours = Math.floor(diffMins / 60);
+        const mins = diffMins % 60;
+        return `${hours}h ${mins}m`;
+    }
+
+    // Drag and Drop handlers
+    let draggedEntry = null;
+
+    function handleDragStart(event, entryId) {
+        draggedEntry = entryId;
+        event.target.classList.add('dragging');
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', entryId);
+    }
+
+    function handleDragEnd(event) {
+        event.target.classList.remove('dragging');
+        draggedEntry = null;
+    }
+
+    function handleDragOver(event) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        event.currentTarget.classList.add('drag-over');
+    }
+
+    function handleDragLeave(event) {
+        event.currentTarget.classList.remove('drag-over');
+    }
+
+    async function handleDrop(event, roomId) {
+        event.preventDefault();
+        event.currentTarget.classList.remove('drag-over');
+
+        const entryId = event.dataTransfer.getData('text/plain') || draggedEntry;
+        if (!entryId) return;
+
+        try {
+            const result = await API.put(`/api/queue/${entryId}/assign-room`, { room_id: roomId });
+            if (result.success) {
+                loadAllColumns();
+            } else {
+                webAlert('Error', result.error || 'Failed to assign room');
+            }
+        } catch (error) {
+            console.error('Error assigning room:', error);
+            webAlert('Error', 'Failed to assign patient to room');
+        }
+    }
+
+    // Toggle room status flags
+    async function toggleRoomStatus(entryId, flag, value) {
+        try {
+            const data = {};
+            data[flag] = value;
+            const result = await API.put(`/api/queue/${entryId}/room-status`, data);
+            if (result.success) {
+                loadRooms();
+            }
+        } catch (error) {
+            console.error('Error updating status:', error);
+        }
+    }
+
+    // Complete patient from room
+    async function completeFromRoom(entryId) {
+        try {
+            const result = await API.put(`/api/queue/${entryId}/unassign-room`, { action: 'complete' });
+            if (result.success) {
+                loadAllColumns();
+            }
+        } catch (error) {
+            console.error('Error completing patient:', error);
+        }
+    }
+
+    // Return patient to waiting
+    async function returnToWaiting(entryId) {
+        try {
+            const result = await API.put(`/api/queue/${entryId}/unassign-room`, { action: 'waiting' });
+            if (result.success) {
+                loadAllColumns();
+            }
+        } catch (error) {
+            console.error('Error returning patient:', error);
+        }
+    }
+
+    // Add new room function is now handled by modal logic above.
+    // Keeping this comment anchor to ensure clean replacement if needed.
+
+    // Web Modal System
+    function closeWebModal() {
+        document.getElementById('webModal').style.display = 'none';
+    }
+
+    function webAlert(title, message) {
+        document.getElementById('webModalTitle').textContent = title;
+        document.getElementById('webModalMessage').textContent = message;
+
+        const actions = document.getElementById('webModalActions');
+        actions.innerHTML = `
+            <button class="btn btn-primary" onclick="closeWebModal()">OK</button>
+        `;
+
+        document.getElementById('webModal').style.display = 'flex';
+    }
+
+    function webConfirm(title, message, onYes) {
+        document.getElementById('webModalTitle').textContent = title;
+        document.getElementById('webModalMessage').textContent = message;
+
+        const actions = document.getElementById('webModalActions');
+        actions.innerHTML = '';
+
+        const btnNo = document.createElement('button');
+        btnNo.className = 'btn btn-secondary';
+        btnNo.textContent = 'Cancel';
+        btnNo.onclick = closeWebModal;
+
+        const btnYes = document.createElement('button');
+        btnYes.className = 'btn btn-primary';
+        btnYes.textContent = 'Confirm';
+        btnYes.onclick = () => {
+            closeWebModal();
+            onYes();
+        };
+
+        actions.appendChild(btnNo);
+        actions.appendChild(btnYes);
+
+        document.getElementById('webModal').style.display = 'flex';
+    }
+
+    // Call Patient Function
+    function callPatient(phone, name) {
+        if (!phone || phone === 'null' || phone === 'undefined') {
+            webAlert('Call Failed', 'No phone number on file for this patient.');
+            return;
+        }
+
+        const cleanPhone = phone.replace(/\D/g, ''); // Digits only
+
+        webConfirm(
+            'Call Patient',
+            `Do you want to call ${name}?\nNumber: ${phone}`,
+            () => {
+                window.location.href = `tel:${cleanPhone}`;
+            }
+        );
+    }
+
+    // Load completed queue
+    async function loadCompletedQueue() {
+        try {
+            const providerId = getProviderFilter();
+            const result = await API.get(`/api/queue/by-status/completed?doctor_id=${providerId}`);
+            if (result.success) {
+                renderCompletedBar(result.entries);
+                document.getElementById('completedCount').textContent = result.entries.length;
+            }
+        } catch (error) {
+            console.error('Error loading completed queue:', error);
+        }
+    }
+
+    // Render completed bar (horizontal layout)
+    function renderCompletedBar(entries) {
+        const container = document.getElementById('completedColumn');
+
+        if (entries.length === 0) {
+            container.innerHTML = `<div class="completed-card" style="opacity: 0.5;"><span>No patients completed today</span></div>`;
+            return;
+        }
+
+        container.innerHTML = entries.map(entry => `
+            <div class="completed-card ${entry.status === 'no_show' ? 'no-show' : ''}">
+                <div class="patient-name">${entry.first_name} ${entry.last_name}</div>
+                <div class="completed-time">${entry.status === 'no_show' ? '❌ No Show' : '✅ ' + formatCompletedTime(entry.completed_at)}</div>
+            </div>
+        `).join('');
+    }
+
+    function formatCompletedTime(timestamp) {
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Global loadQueue wrapper for the select onchange
+    window.loadQueue = loadAllColumns;
+
+    // Load appointments for today
+    async function loadAppointments() {
+        try {
+            const now = new Date();
+            const start = new Date(now);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(now);
+            end.setHours(23, 59, 59, 999);
+
+            const params = new URLSearchParams({
+                start: start.toISOString(),
+                end: end.toISOString()
+            });
+
+            const result = await API.get(`/api/appointments?${params.toString()}`);
+            if (result.success) {
+                renderAppointments(result.appointments);
+                document.getElementById('appointmentsCount').textContent = result.appointments.length;
+            }
+        } catch (error) {
+            console.error('Error loading appointments:', error);
+        }
+    }
+
+    function renderAppointments(appointments) {
+        const container = document.getElementById('appointmentsColumn');
+
+        if (appointments.length === 0) {
+            container.innerHTML = `
+                <div class="column-empty">
+                    <div class="column-empty-icon">📅</div>
+                    <p>No appointments today</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = appointments.map(appt => {
+            const time = new Date(appt.appointment_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const isBlocked = appt.status === 'blocked';
+
+            // Status indicators HTML
+            // Status indicators HTML
+            // Order: Confirmed (Yellow), Arrived (Teal), Stepping Out (Purple), Checked In (Green)
+            const statusIndicators = !isBlocked ? `
+                <div class="status-indicators" style="margin-top: 6px;">
+                    <span class="status-circle confirmed ${appt.confirmed ? 'active' : ''}" data-tooltip="Confirmed"></span>
+                    <span class="status-circle arrived ${appt.arrived ? 'active' : ''}" data-tooltip="Arrived"></span>
+                    <span class="status-circle stepping-out ${appt.stepping_out ? 'active' : ''}" data-tooltip="Stepping Out"></span>
+                    <span class="status-circle checked-in ${appt.checked_in ? 'active' : ''}" data-tooltip="Checked In"></span>
+                </div>
+            ` : '';
+
+            return `
+            <div class="patient-card" style="border-left: 4px solid ${isBlocked ? '#64748b' : '#3b82f6'};">
+                <div class="patient-card-header">
+                    <div style="font-weight:bold; font-size:1.1em; color:var(--color-primary); width:60px;">
+                        ${time}
+                    </div>
+                    <div class="patient-info">
+                        <div class="patient-name">${isBlocked ? 'Blocked Time' : `${appt.first_name} ${appt.last_name}`}</div>
+                        <div class="patient-details">
+                            ${appt.service ? `<span>🏥 ${appt.service}</span>` : ''}
+                            ${appt.resource ? `<span>👨‍⚕️ One of the docs</span>` : ''} 
+                            ${appt.phone ? `<span>📞 ${appt.phone}</span>` : ''}
+                        </div>
+                        ${statusIndicators}
+                    </div>
+                </div>
+                ${!isBlocked ? `
+                <div class="patient-actions">
+                     <button class="btn btn-sm btn-success" onclick="checkInAppointment(${appt.id}, ${appt.patient_id})">
+                        ✅ Check In
+                     </button>
+                </div>
+                ` : ''}
+            </div>
+            `;
+        }).join('');
+    }
+
+    async function checkInAppointment(apptId, patientId) {
+        console.log('checkInAppointment called with:', { apptId, patientId });
+
+        if (!patientId) {
+            webAlert('Error', 'Missing patient ID for this appointment.');
+            return;
+        }
+
+        webConfirm('Check In', 'Are you sure you want to check in this patient?', async () => {
+            // Get current provider filter to assign doctor
+            const providerId = getProviderFilter();
+
+            try {
+                const payload = {
+                    patient_id: patientId,
+                    appointment_id: apptId
+                };
+
+                if (providerId) {
+                    payload.doctor_id = providerId;
+                }
+
+                const res = await API.post('/api/checkin', payload);
+
+                if (res.success) {
+                    // Show success feedback
+                    await loadAllColumns();
+                } else {
+                    webAlert('Check In Failed', 'Error: ' + (res.error || 'Unknown error'));
+                }
+            } catch (e) {
+                console.error('Checkin failed:', e);
+                webAlert('System Error', 'Failed to check in: ' + e.message);
+            }
+        });
+    }
+
+    // Render column
+    function renderColumn(columnId, entries, type) {
+        const container = document.getElementById(columnId);
+
+        if (entries.length === 0) {
+            const emptyIcons = {
+                waiting: '⏳',
+                serving: '👨‍⚕️',
+                completed: '✅'
+            };
+            const emptyMessages = {
+                waiting: 'No patients waiting',
+                serving: 'No patients being served',
+                completed: 'No patients completed'
+            };
+            container.innerHTML = `
+            <div class="column-empty">
+                <div class="column-empty-icon">${emptyIcons[type]}</div>
+                <p>${emptyMessages[type]}</p>
+            </div>
+        `;
+            return;
+        }
+
+        container.innerHTML = entries.map(entry => `
+        <div class="patient-card fade-in" data-id="${entry.id}">
+            ${entry.unread_messages > 0 ? `
+                <div class="message-badge" title="${entry.unread_messages} unread message(s)">
+                    📩
+                </div>
+            ` : ''}
+            
+            <div class="patient-card-header">
+                ${entry.position ? `<div class="patient-position">${entry.position}</div>` : ''}
+                <div class="patient-info">
+                    <div class="patient-name">${entry.first_name} ${entry.last_name}</div>
+                    <div class="patient-details">
+                        <span>📞 ${entry.phone}</span>
+                        ${entry.estimated_wait_minutes ? `<span>⏱️ Est. ${formatTime(entry.estimated_wait_minutes)}</span>` : ''}
+                        ${entry.notes ? `<span>📝 ${entry.notes}</span>` : ''}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="patient-actions">
+                ${type === 'waiting' ? `
+                    <button class="btn btn-sm btn-outline-primary" onclick="showAlertModal(${entry.id}, '${entry.first_name} ${entry.last_name}', ${entry.position}, ${entry.estimated_wait_minutes || 15})">
+                        💬 Alert
+                    </button>
+                    <button class="btn btn-sm btn-outline-success" 
+                            data-phone="${entry.phone || ''}" 
+                            data-name="${entry.first_name} ${entry.last_name}"
+                            onclick="callPatient(this.getAttribute('data-phone'), this.getAttribute('data-name'))">
+                        📞 Call
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="moveUp(${entry.id}, ${entry.position})">
+                        ⬆️
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="moveDown(${entry.id}, ${entry.position})">
+                        ⬇️
+                    </button>
+                ` : ''}
+                ${type === 'serving' ? `
+                    <button class="btn btn-sm btn-success" onclick="markComplete(${entry.id})">
+                        ✅ Complete
+                    </button>
+                ` : ''}
+                ${type === 'completed' ? `
+                    <span class="badge badge-success">✅ ${entry.status}</span>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+
+        // Add draggable attributes for waiting cards
+        if (type === 'waiting') {
+            container.querySelectorAll('.patient-card').forEach(card => {
+                const entryId = card.dataset.id;
+                card.draggable = true;
+                card.ondragstart = (e) => handleDragStart(e, entryId);
+                card.ondragend = handleDragEnd;
+            });
+        }
+    }
+
+    // Alert Modal Functions
+    async function loadAlertTemplates() {
+        try {
+            const result = await API.get('/api/alert-templates');
+            if (result.success) {
+                alertTemplates = result.templates;
+                updateTemplateSelect();
+            }
+        } catch (error) {
+            console.error('Error loading templates:', error);
+        }
+    }
+
+    function updateTemplateSelect() {
+        const select = document.getElementById('alertTemplateSelect');
+        select.innerHTML = '<option value="">Select a template...</option>' +
+            alertTemplates.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+
+        select.onchange = updateAlertPreview;
+    }
+
+    function showAlertModal(entryId, patientName, position, waitTime) {
+        currentAlertEntry = { id: entryId, name: patientName, position, waitTime };
+        document.getElementById('alertPatientName').textContent = patientName;
+        document.getElementById('alertModal').style.display = 'flex';
+        updateAlertPreview();
+    }
+
+    function updateAlertPreview() {
+        const select = document.getElementById('alertTemplateSelect');
+        const preview = document.getElementById('alertPreview');
+
+        if (!select.value || !currentAlertEntry) {
+            preview.innerHTML = 'Select a template to see preview';
+            preview.style.color = 'var(--color-text-tertiary)';
+            return;
+        }
+
+        const template = alertTemplates.find(t => t.id == select.value);
+        if (!template) return;
+
+        let message = template.message_template;
+        message = message.replace('{patient_name}', currentAlertEntry.name);
+        message = message.replace('{position}', currentAlertEntry.position);
+        message = message.replace('{wait_time}', formatTime(currentAlertEntry.waitTime));
+
+        preview.innerHTML = message;
+        preview.style.color = 'var(--color-text)';
+    }
+
+    async function sendAlert() {
+        const templateId = document.getElementById('alertTemplateSelect').value;
+
+        if (!templateId) {
+            alert('Please select a template');
+            return;
+        }
+
+        try {
+            const result = await API.post(`/api/queue/${currentAlertEntry.id}/alert`, {
+                template_id: parseInt(templateId)
+            });
+
+            if (result.success) {
+                alert('✅ Alert sent successfully!');
+                closeAlertModal();
+            } else {
+                alert('❌ Error: ' + result.error);
+            }
+        } catch (error) {
+            alert('❌ Error sending alert');
+            console.error(error);
+        }
+    }
+
+    function closeAlertModal() {
+        document.getElementById('alertModal').style.display = 'none';
+        currentAlertEntry = null;
+    }
+
+    // Queue Actions
+
+    async function markComplete(entryId) {
+        try {
+            await API.post(`/api/queue/${entryId}/complete`);
+            loadAllColumns();
+        } catch (error) {
+            console.error('Error completing patient:', error);
+        }
+    }
+
+    async function moveUp(entryId, currentPos) {
+        if (currentPos <= 1) return;
+
+        try {
+            await API.post('/api/queue/reorder', {
+                entry_id: entryId,
+                new_position: currentPos - 1
+            });
+            loadWaitingQueue();
+        } catch (error) {
+            console.error('Error moving patient:', error);
+        }
+    }
+
+    async function moveDown(entryId, currentPos) {
+        try {
+            await API.post('/api/queue/reorder', {
+                entry_id: entryId,
+                new_position: currentPos + 1
+            });
+            loadWaitingQueue();
+        } catch (error) {
+            console.error('Error moving patient:', error);
+        }
+    }
+
+    // Message Functions
+    async function checkUnreadMessages() {
+        try {
+            const result = await API.get('/api/messages/unread-count');
+            if (result.success && result.count > 0) {
+                const badge = document.getElementById('messagesBadge');
+                badge.textContent = result.count;
+                badge.style.display = 'flex';
+            }
+        } catch (error) {
+            console.error('Error checking messages:', error);
+        }
+    }
+
+    async function checkNewMessages() {
+        try {
+            const result = await API.get('/api/messages/unread-count');
+            if (result.success && result.count > lastMessageCheck) {
+                // New message arrived
+                showMessagePopup(`You have ${result.count} new message(s) from patients`);
+                lastMessageCheck = result.count;
+                checkUnreadMessages();
+                loadAllColumns(); // Refresh to show message badges
+            }
+        } catch (error) {
+            console.error('Error checking new messages:', error);
+        }
+    }
+
+    function showMessagePopup(text) {
+        const popup = document.getElementById('messagePopup');
+        document.getElementById('messagePopupText').textContent = text;
+        popup.style.display = 'block';
+
+        // Auto-hide after 10 seconds
+        setTimeout(() => {
+            closeMessagePopup();
+        }, 10000);
+    }
+
+    function closeMessagePopup() {
+        document.getElementById('messagePopup').style.display = 'none';
+    }
+
+    function viewMessages() {
+        window.location.href = '/messages';
+    }
+
+    function showAnalytics() {
+        alert('Analytics page coming soon!');
+    }
+</script>
+{% endblock %}
