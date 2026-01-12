@@ -325,7 +325,7 @@
                     <td>${p.first_name} ${p.last_name}</td>
                     <td>${p.phone || '-'}</td>
                     <td>${p.email || '-'}</td>
-                    <td>${formatDate(p.created_at)}</td>
+                    <td>${formatDate(p.last_visit)}</td>
                     <td>
                         <button class="btn btn-sm btn-secondary" onclick="openPatientModal(${p.id})">Edit</button>
                         <button class="btn btn-sm" onclick="openGlobalAppointmentModal(${p.id}, '${p.first_name} ${p.last_name}')">📅</button>

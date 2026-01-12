@@ -136,15 +136,21 @@ def api_search_patients():
         
         if search:
             cursor.execute('''
-                SELECT * FROM patients 
-                WHERE first_name LIKE ? OR last_name LIKE ? OR phone LIKE ?
-                ORDER BY last_name, first_name
+                SELECT 
+                    p.*,
+                    (SELECT MAX(checked_in_at) FROM queue_entries WHERE patient_id = p.id) as last_visit
+                FROM patients p
+                WHERE p.first_name LIKE ? OR p.last_name LIKE ? OR p.phone LIKE ?
+                ORDER BY p.last_name, p.first_name
                 LIMIT 20
             ''', (f'%{search}%', f'%{search}%', f'%{search}%'))
         else:
             cursor.execute('''
-                SELECT * FROM patients 
-                ORDER BY last_name, first_name
+                SELECT 
+                    p.*,
+                    (SELECT MAX(checked_in_at) FROM queue_entries WHERE patient_id = p.id) as last_visit
+                FROM patients p
+                ORDER BY p.last_name, p.first_name
                 LIMIT 20
             ''')
         
