@@ -1658,14 +1658,21 @@
             }
 
             if (res.success) {
-                closeDoctorModal();
-                loadDoctors();
-                // If schedule tab is open, reload that too
+                // 1. Reload data FIRST
+                await loadDoctors();
+                
+                // 2. Try to close modal
+                try { closeDoctorModal(); } catch(e) { console.error(e); }
+
+                // 3. Reload schedule if visible
                 if (document.getElementById('settings-schedule').classList.contains('active')) {
-                    loadScheduleMatrix();
+                     if (window.loadScheduleMatrix) loadScheduleMatrix();
                 }
+                
+                // 4. Feedback
+                // alert("Doctor saved successfully"); // Optional, maybe too noisy? Let's skip alert if it works visibly.
             } else {
-                alert("Error: " + res.error);
+                alert("Error: " + (res.error || 'Unknown error'));
             }
         }
 
