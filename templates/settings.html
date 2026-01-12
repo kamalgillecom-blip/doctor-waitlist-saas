@@ -948,20 +948,7 @@
         }
 </script>
 
-async function addDoctor() {
-const name = prompt("Enter Doctor Name:");
-if (!name) return;
-const specialty = prompt("Enter Specialty (e.g. Cardiologist):");
-const color = prompt("Enter Color Hex (e.g. #FF0000):") || '#3b82f6';
-const email = prompt("Enter Email (optional):");
 
-const res = await API.post('/api/doctors', { name, specialty, color, email });
-if (res.success) {
-loadDoctors();
-} else {
-alert('Error adding doctor: ' + res.error);
-}
-}
 
 // Extend API helper to support DELETE
 // (Assuming API helper in base.html doesn't have delete, let's just use fetch here or hope it does)
