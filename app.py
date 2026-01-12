@@ -35,8 +35,12 @@ CORS(app)
 # Initialize database on first run
 try:
     init_db()
-except:
-    pass
+    # Run migrations
+    import migrate_auth
+    migrate_auth.migrate()
+    print("Database initialization and migration complete")
+except Exception as e:
+    print(f"Database initialization error: {e}")
 
 # ============================================================================
 # API Routes - Queue Management
