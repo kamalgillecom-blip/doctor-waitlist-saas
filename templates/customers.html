@@ -66,6 +66,68 @@
         justify-content: center;
         font-weight: 600;
     }
+
+    /* Modal Tabs */
+    .modal-tabs {
+        display: flex;
+        gap: 10px;
+        border-bottom: 2px solid var(--color-border-light);
+        margin-bottom: 20px;
+    }
+
+    .tab-btn {
+        background: none;
+        border: none;
+        padding: 10px 15px;
+        cursor: pointer;
+        font-weight: 600;
+        color: var(--color-text-secondary);
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        font-size: 1rem;
+    }
+
+    .tab-btn.active {
+        color: var(--color-primary);
+        border-bottom-color: var(--color-primary);
+    }
+
+    /* File Upload */
+    .file-drop-zone {
+        border: 2px dashed var(--color-border);
+        padding: 30px;
+        text-align: center;
+        border-radius: 8px;
+        margin: 20px 0;
+        cursor: pointer;
+        position: relative;
+        transition: background 0.2s;
+    }
+
+    .file-drop-zone:hover {
+        background: var(--color-bg);
+        border-color: var(--color-primary);
+    }
+
+    .file-input {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+
+    .template-download a {
+        color: var(--color-primary);
+        text-decoration: none;
+        font-size: 0.9rem;
+    }
+
+    .template-download a:hover {
+        text-decoration: underline;
+    }
 </style>
 {% endblock %}
 
