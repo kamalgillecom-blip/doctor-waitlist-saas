@@ -2109,7 +2109,7 @@ def api_update_schedule():
         # Upsert
         cursor.execute('''
             INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_available)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(doctor_id, day_of_week) DO UPDATE SET
             start_time=excluded.start_time,
             end_time=excluded.end_time,
