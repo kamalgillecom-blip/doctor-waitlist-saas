@@ -1640,39 +1640,38 @@
         }
 
         async function saveDoctorForm() {
-            const id = document.getElementById('dm-id').value;
-            const data = {
-                name: document.getElementById('dm-name').value,
-                specialty: document.getElementById('dm-specialty').value,
-                email: document.getElementById('dm-email').value,
-                color: document.getElementById('dm-color').value
-            };
+            console.log("saveDoctorForm called");
+            try {
+                const id = document.getElementById('dm-id').value;
+                const data = {
+                    name: document.getElementById('dm-name').value,
+                    specialty: document.getElementById('dm-specialty').value,
+                    email: document.getElementById('dm-email').value,
+                    color: document.getElementById('dm-color').value
+                };
 
-            if (!data.name) return alert("Name is required");
+                if (!data.name) return alert("Name is required");
 
-            let res;
-            if (id) {
-                res = await API.put(`/api/doctors/${id}`, data);
-            } else {
-                res = await API.post('/api/doctors', data);
-            }
-
-            if (res.success) {
-                // 1. Reload data FIRST
-                await loadDoctors();
-                
-                // 2. Try to close modal
-                try { closeDoctorModal(); } catch(e) { console.error(e); }
-
-                // 3. Reload schedule if visible
-                if (document.getElementById('settings-schedule').classList.contains('active')) {
-                     if (window.loadScheduleMatrix) loadScheduleMatrix();
+                let res;
+                if (id) {
+                    res = await API.put(`/api/doctors/${id}`, data);
+                } else {
+                    res = await API.post('/api/doctors', data);
                 }
-                
-                // 4. Feedback
-                // alert("Doctor saved successfully"); // Optional, maybe too noisy? Let's skip alert if it works visibly.
-            } else {
-                alert("Error: " + (res.error || 'Unknown error'));
+
+                if (res.success) {
+                    await loadDoctors();
+                    try { closeDoctorModal(); } catch(e) { console.error("Error closing modal", e); }
+                    
+                    if (document.getElementById('settings-schedule') && document.getElementById('settings-schedule').classList.contains('active')) {
+                        if (window.loadScheduleMatrix) loadScheduleMatrix();
+                    }
+                } else {
+                    alert("Error from server: " + (res.error || 'Unknown error'));
+                }
+            } catch (e) {
+                console.error("Critical error in saveDoctorForm:", e);
+                alert("Client-side Error: " + e.message);
             }
         }
 
