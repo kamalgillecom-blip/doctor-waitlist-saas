@@ -2123,6 +2123,64 @@ def api_update_schedule():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/schedules/blocked', methods=['GET'])
+def api_get_blocked_times():
+    """Get blocked times (breaks)"""
+    try:
+        doctor_id = request.args.get('doctor_id')
+        db = get_db()
+        cursor = db.cursor()
+        
+        if doctor_id:
+            cursor.execute("SELECT * FROM doctor_blocked_times WHERE doctor_id = ?", (doctor_id,))
+        else:
+            cursor.execute("SELECT * FROM doctor_blocked_times")
+            
+        blocks = [dict(row) for row in cursor.fetchall()]
+        db.close()
+        return jsonify({'success': True, 'blocked_times': blocks})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/schedules/blocked', methods=['POST'])
+def api_add_blocked_time():
+    """Add a blocked time period"""
+    try:
+        data = request.json
+        doctor_id = data.get('doctor_id')
+        day_of_week = data.get('day_of_week')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+        label = data.get('label', 'Break')
+        
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute('''
+            INSERT INTO doctor_blocked_times (doctor_id, day_of_week, start_time, end_time, label)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (doctor_id, day_of_week, start_time, end_time, label))
+        
+        db.commit()
+        block_id = cursor.lastrowid
+        db.close()
+        return jsonify({'success': True, 'id': block_id})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/schedules/blocked/<int:block_id>', methods=['DELETE'])
+def api_delete_blocked_time(block_id):
+    """Delete a blocked time period"""
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM doctor_blocked_times WHERE id = ?", (block_id,))
+        db.commit()
+        db.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 # ============================================================================
 # API Routes - Patient Forms
 # ============================================================================

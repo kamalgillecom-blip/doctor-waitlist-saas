@@ -289,6 +289,19 @@ def init_db():
         )
     ''')
 
+    # Doctor Blocked Times (Breaks/Lunch)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS doctor_blocked_times (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            doctor_id INTEGER NOT NULL,
+            day_of_week INTEGER NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            label TEXT,
+            FOREIGN KEY (doctor_id) REFERENCES doctors (id)
+        )
+    ''')
+
     try:
         cursor.execute('ALTER TABLE queue_entries ADD COLUMN doctor_id INTEGER')
     except:

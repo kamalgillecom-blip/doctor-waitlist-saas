@@ -577,28 +577,55 @@
         }
     }
 
-    async function loadDoctors() {
-        const res = await API.get('/api/doctors');
-        if (res.success) {
-            const list = document.getElementById('doctorsList');
-            if (res.doctors.length === 0) {
-                list.innerHTML = '<p class="text-muted">No doctors found.</p>';
-                return;
+    async function deleteDoctor(id) {
+        if (!confirm("Are you sure you want to delete this doctor?")) return;
+        try {
+            const res = await fetch(`/api/doctors/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                loadDoctors();
+                // ensure schedule is reloaded if open
+                if (window.loadScheduleMatrix) loadScheduleMatrix();
+            } else {
+                alert("Error: " + (data.error || 'Failed to delete'));
             }
-            list.innerHTML = res.doctors.map(d => `
-                <div class="card p-3 mb-2" style="border-left: 5px solid ${d.color || '#ccc'}">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <strong>${d.name}</strong> <small class="text-muted">(${d.specialty || 'General'})</small>
-                            <br><small class="text-muted" style="font-size:0.8em">${d.email || ''}</small>
+        } catch (e) {
+            console.error(e);
+            alert("Error deleting doctor");
+        }
+    }
+
+    async function loadDoctors() {
+        const list = document.getElementById('doctorsList');
+        try {
+            // Cache-busting to ensure fresh list
+            const res = await API.get('/api/doctors?_=' + Date.now());
+            if (res.success) {
+                if (res.doctors.length === 0) {
+                    list.innerHTML = '<p class="text-muted">No doctors found.</p>';
+                    return;
+                }
+                list.innerHTML = res.doctors.map(d => {
+                    // Safe object passing
+                    const safeDoc = JSON.stringify(d).replace(/'/g, "&#39;");
+                    return `
+                    <div class="card p-3 mb-2" style="border-left: 5px solid ${d.color || '#ccc'}">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <strong>${d.name}</strong> <small class="text-muted">(${d.specialty || 'General'})</small>
+                                <br><small class="text-muted" style="font-size:0.8em">${d.email || ''}</small>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline" onclick='openDoctorModal(${safeDoc})'>Edit</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteDoctor(${d.id})">Delete</button>
+                            </div>
                         </div>
-                        <div>
-                            <button class="btn btn-sm btn-outline" onclick="editDoctor(${d.id}, '${d.name}', '${d.specialty || ''}', '${d.color || ''}', '${d.email || ''}')">Edit</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteDoctor(${d.id})">Delete</button>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
+                    </div>`;
+                }).join('');
+            }
+        } catch (e) {
+            console.error("Error loading doctors:", e);
+            list.innerHTML = '<p class="text-danger">Error loading doctors. Please refresh.</p>';
         }
     }
 
@@ -1410,6 +1437,44 @@
         </div>
     </div>
 </div>
+</div>
+
+<!-- Break Modal (Blocked Times) -->
+<div id="breakModal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="bm-title">Manage Breaks</h3>
+            <button class="close-modal" onclick="closeBreakModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="bm-doc-id">
+            <input type="hidden" id="bm-day-idx">
+
+            <div id="bm-existing-list" style="margin-bottom: 20px;">
+                <!-- List of existing breaks -->
+            </div>
+
+            <div style="border-top: 1px solid #eee; padding-top: 15px;">
+                <h5>Add New Break</h5>
+                <div class="row" style="display:flex; gap:10px; margin-bottom:10px;">
+                    <div class="col" style="flex:1">
+                        <label style="font-size:0.8em">Start</label>
+                        <input type="time" id="bm-start" class="form-control">
+                    </div>
+                    <div class="col" style="flex:1">
+                        <label style="font-size:0.8em">End</label>
+                        <input type="time" id="bm-end" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label style="font-size:0.8em">Label</label>
+                    <input type="text" id="bm-label" class="form-control" placeholder="Lunch, Meeting, etc.">
+                </div>
+                <button class="btn btn-sm btn-success" onclick="saveBreak()">+ Add Break</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <style>
     .color-swatches {
@@ -1617,16 +1682,22 @@
             container.innerHTML = '<p class="text-center text-muted">Loading schedule...</p>';
             
             try {
-                const res = await API.get('/api/schedules');
-                if (!res.success) throw new Error(res.error);
+                // Fetch schedule and blocked times in parallel
+                const [schedRes, blockRes] = await Promise.all([
+                    API.get('/api/schedules'),
+                    API.get('/api/schedules/blocked')
+                ]);
 
-                renderScheduleMatrix(res.doctors);
+                if (!schedRes.success) throw new Error(schedRes.error);
+                
+                const blockedTimes = blockRes.success ? blockRes.blocked_times : [];
+                renderScheduleMatrix(schedRes.doctors, blockedTimes);
             } catch (e) {
                 container.innerHTML = `<p class="text-danger">Error loading schedule: ${e.message}</p>`;
             }
         }
 
-        function renderScheduleMatrix(doctors) {
+        function renderScheduleMatrix(doctors, blockedTimes=[]) {
             const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
             let html = '<div class="schedule-matrix">';
             
@@ -1640,32 +1711,33 @@
                 </div>`;
                 
                 days.forEach((day, idx) => {
-                    // JS day 0 is Sunday, but our DB 0 is Monday usually. Let's standardize:
-                    // Let's assume 0=Mon, 6=Sun in our DB schema comment.
                     const dayIdx = idx; 
-                    
                     const sched = (doc.schedule || []).find(s => s.day_of_week === dayIdx) || {};
-                    const isAvail = sched.is_available !== 0 && sched.is_available !== false; // Default true if null? No, default should be false if no record? 
-                    // Actually let's default to false if no record, or true if we want to be nice.
-                    // The DB default is 1, but if no row exists logic is tricky. Let's say if row exists use it.
                     
                     const start = sched.start_time || '09:00';
                     const end = sched.end_time || '17:00';
                     const checked = (sched.is_available === 1 || sched.is_available === true) ? 'checked' : '';
-                    if (!sched.id) {
-                         // No record implies available? Or not? Let's say not available until set.
-                         // Or maybe default new docs to M-F 9-5?
-                         // Let's leave unchecked if no record.
-                    }
+                    
+                    // Filter blocks for this cell
+                    const cellBlocks = blockedTimes.filter(b => b.doctor_id === doc.id && b.day_of_week === dayIdx);
+                    const blockCount = cellBlocks.length;
+                    
+                    const startId = `start-${doc.id}-${dayIdx}`;
+                    const endId = `end-${doc.id}-${dayIdx}`;
 
                     html += `<div class="matrix-cell">
-                        <label class="toggle-switch">
-                            <input type="checkbox" ${checked} onchange="updateSchedule(${doc.id}, ${dayIdx}, this.checked, '${start}', '${end}')">
-                            <span class="slider"></span>
-                        </label>
-                        <div style="opacity: ${checked ? 1 : 0.5}; pointer-events: ${checked ? 'auto' : 'none'};">
-                            <input type="time" class="time-input-xs mb-1" value="${start}" onchange="updateSchedule(${doc.id}, ${dayIdx}, true, this.value, this.nextElementSibling.value)">
-                            <input type="time" class="time-input-xs" value="${end}" onchange="updateSchedule(${doc.id}, ${dayIdx}, true, this.previousElementSibling.value, this.value)">
+                        <div style="display:flex; justify-content:space-between; width:100%; margin-bottom:5px;">
+                            <label class="toggle-switch" style="transform:scale(0.8);">
+                                <input type="checkbox" ${checked} onchange="updateSchedule(${doc.id}, ${dayIdx}, this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                            <button class="btn btn-xs btn-outline" style="padding:0 4px; font-size:0.7em;" onclick="openBreakModal(${doc.id}, ${dayIdx}, '${doc.name}', '${days[dayIdx]}')">
+                                ${blockCount > 0 ? '☕ ' + blockCount : '☕'}
+                            </button>
+                        </div>
+                        <div style="opacity: ${checked ? 1 : 0.5}; pointer-events: ${checked ? 'auto' : 'none'}; width:100%;">
+                            <input type="time" id="${startId}" class="time-input-xs mb-1" value="${start}" onchange="updateSchedule(${doc.id}, ${dayIdx}, true)">
+                            <input type="time" id="${endId}" class="time-input-xs" value="${end}" onchange="updateSchedule(${doc.id}, ${dayIdx}, true)">
                         </div>
                     </div>`;
                 });
@@ -1675,8 +1747,13 @@
             document.getElementById('schedule-matrix-container').innerHTML = html;
         }
 
-        async function updateSchedule(docId, dayIdx, isAvail, start, end) {
-            // console.log('Updating', docId, dayIdx, isAvail, start, end);
+        async function updateSchedule(docId, dayIdx, isAvail) {
+             const startInput = document.getElementById(`start-${docId}-${dayIdx}`);
+             const endInput = document.getElementById(`end-${docId}-${dayIdx}`);
+             
+             const start = startInput ? startInput.value : '09:00';
+             const end = endInput ? endInput.value : '17:00';
+
             try {
                 await API.post('/api/schedules', {
                     doctor_id: docId,
@@ -1685,11 +1762,91 @@
                     start_time: start,
                     end_time: end
                 });
-                // Optional: visual feedback toast
             } catch (e) {
                 console.error(e);
                 alert("Failed to save schedule");
             }
+        }
+
+        // Break Management Logic
+        let currentBreakDoc = null;
+        let currentBreakDay = null;
+
+        async function openBreakModal(docId, dayIdx, docName, dayName) {
+            currentBreakDoc = docId;
+            currentBreakDay = dayIdx;
+            
+            document.getElementById('bm-title').innerText = `Breaks: ${docName} on ${dayName}`;
+            document.getElementById('bm-start').value = '12:00';
+            document.getElementById('bm-end').value = '13:00';
+            document.getElementById('bm-label').value = 'Lunch';
+            
+            await loadBreaksList();
+            document.getElementById('breakModal').style.display = 'flex';
+        }
+
+        async function loadBreaksList() {
+            const list = document.getElementById('bm-existing-list');
+            list.innerHTML = '<p class="text-muted">Loading...</p>';
+            
+            try {
+                const res = await API.get(`/api/schedules/blocked?doctor_id=${currentBreakDoc}`);
+                if (res.success) {
+                    const breaks = res.blocked_times.filter(b => b.day_of_week === currentBreakDay);
+                    if (breaks.length === 0) {
+                        list.innerHTML = '<p class="text-muted" style="font-size:0.9em">No breaks set for this day.</p>';
+                    } else {
+                        list.innerHTML = breaks.map(b => `
+                            <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:8px; border-radius:4px; margin-bottom:5px; font-size:0.9em;">
+                                <span><strong>${b.start_time} - ${b.end_time}</strong> <span class="text-muted">(${b.label||'Break'})</span></span>
+                                <button class="btn btn-sm btn-danger" onclick="deleteBreak(${b.id})" style="padding:2px 6px; font-size:0.8em;">×</button>
+                            </div>
+                        `).join('');
+                    }
+                }
+            } catch (e) {
+                list.innerHTML = `<p class="text-danger">Error: ${e.message}</p>`;
+            }
+        }
+
+        async function saveBreak() {
+            const start = document.getElementById('bm-start').value;
+            const end = document.getElementById('bm-end').value;
+            const label = document.getElementById('bm-label').value;
+            
+            if (!start || !end) return alert("Start and End times required");
+            if (start >= end) return alert("Start time must be before end time");
+
+            try {
+                const res = await API.post('/api/schedules/blocked', {
+                    doctor_id: currentBreakDoc,
+                    day_of_week: currentBreakDay,
+                    start_time: start,
+                    end_time: end,
+                    label: label
+                });
+                if (res.success) {
+                    await loadBreaksList();
+                    loadScheduleMatrix(); // Refresh matrix to update counters
+                } else {
+                    alert("Error saving break: " + res.error);
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        async function deleteBreak(id) {
+            if (!confirm("Delete this break?")) return;
+            try {
+                const res = await API.delete(`/api/schedules/blocked/${id}`);
+                if (res.success) {
+                    await loadBreaksList();
+                    loadScheduleMatrix();
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        function closeBreakModal() {
+            document.getElementById('breakModal').style.display = 'none';
         }
 </script>
 
