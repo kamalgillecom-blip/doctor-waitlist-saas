@@ -8,6 +8,8 @@ from flask import Flask, request, jsonify, render_template, send_from_directory,
 from flask_cors import CORS
 from datetime import datetime, timedelta
 import json
+import csv
+import io
 
 import config
 from database import get_db, init_db
@@ -153,34 +155,7 @@ def api_search_patients():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/patients', methods=['POST'])
-def api_create_patient():
-    """Create new patient"""
-    first_name = request.json.get('first_name')
-    last_name = request.json.get('last_name')
-    phone = request.json.get('phone')
-    phone_type = request.json.get('phone_type', 'Mobile')
-    email = request.json.get('email')
-    
-    if not first_name or not last_name or not phone:
-        return jsonify({'success': False, 'error': 'Missing required fields'}), 400
-        
-    try:
-        db = get_db()
-        cursor = db.cursor()
-        
-        cursor.execute('''
-            INSERT INTO patients (first_name, last_name, phone, phone_type, email)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (first_name, last_name, phone, phone_type, email))
-        
-        patient_id = cursor.lastrowid
-        db.commit()
-        db.close()
-        
-        return jsonify({'success': True, 'patient_id': patient_id})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 # ============================================================================
 # API Routes - Check-in
