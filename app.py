@@ -98,8 +98,8 @@ def signup():
                 conn.close()
                 return redirect(url_for('signup'))
             password_hash = generate_password_hash(password)
-            cursor.execute('INSERT INTO users (email, name, password_hash) VALUES (?, ?, ?)',
-                         (email, name, password_hash))
+            cursor.execute('INSERT INTO users (email, name, password_hash, username, role) VALUES (?, ?, ?, ?, ?)',
+                         (email, name, password_hash, email, 'user'))
             conn.commit()
             conn.close()
             flash('Account created! Please log in.')
