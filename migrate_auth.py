@@ -1,8 +1,10 @@
 import sqlite3
 import hashlib
 
+import config
+
 def get_db():
-    return sqlite3.connect('waitlist.db')
+    return sqlite3.connect(config.DATABASE_PATH)
 
 def migrate():
     conn = get_db()

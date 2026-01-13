@@ -9,7 +9,8 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 DEBUG = True
 
 # Database
-DATABASE_PATH = os.environ.get('DATABASE_PATH', 'waitlist.db')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATABASE_PATH = os.environ.get('DATABASE_PATH', os.path.join(BASE_DIR, 'waitlist.db'))
 
 # SMS Configuration (Twilio)
 SMS_ENABLED = os.environ.get('SMS_ENABLED', 'False').lower() == 'true'
