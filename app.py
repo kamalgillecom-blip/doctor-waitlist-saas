@@ -17,7 +17,10 @@ from database import get_db, init_db
 import queue_service
 import sms_service
 import message_service
+import message_service
 import alert_service
+import email_service
+import uuid
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = 'supersecretkey'  # Change this to a random secret key for production
@@ -27,6 +30,17 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
             return redirect(url_for('login'))
+        
+        # Check subscription status
+        conn = get_db()
+        user = conn.execute('SELECT subscription_status, trial_start, id FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+        conn.close()
+        
+        if user:
+            status, _ = check_trial_status(user)
+            if status == 'expired' and request.endpoint != 'billing' and request.endpoint != 'static' and request.endpoint != 'logout':
+                return redirect(url_for('billing'))
+
         return f(*args, **kwargs)
     return decorated_function
 app.config.from_object(config)
@@ -38,6 +52,8 @@ try:
     # Run migrations
     import migrate_auth
     migrate_auth.migrate()
+    import migrate_trial
+    migrate_trial.migrate()
     print("Database initialization and migration complete")
 except Exception as e:
     print(f"Database initialization error: {e}")
@@ -55,6 +71,20 @@ def inject_office_settings():
         cursor = db.cursor()
         cursor.execute('SELECT * FROM offices LIMIT 1')
         row = cursor.fetchone()
+        
+        # Check trial status for logged in user
+        trial_data = {'is_managed': False}
+        if 'user_id' in session:
+            user = cursor.execute('SELECT * FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+            if user:
+                status, days_left = check_trial_status(user)
+                trial_data = {
+                    'is_managed': True,
+                    'status': status,
+                    'days_left': days_left,
+                    'show_popup': False # Can be improved to show once per session
+                }
+
         if row:
             office = dict(row)
             # Parse theme colors
@@ -63,10 +93,39 @@ def inject_office_settings():
                     office['theme_colors'] = json.loads(office['theme_colors'])
             except:
                 pass
-            return dict(office_settings=office)
+            return dict(office_settings=office, trial=trial_data)
     except:
         pass
-    return dict(office_settings={})
+    return dict(office_settings={}, trial={})
+
+def check_trial_status(user):
+    """Check if trial is active or expired"""
+    if user['subscription_status'] == 'active':
+        return 'active', 999
+        
+    if user['subscription_status'] == 'expired':
+        return 'expired', 0
+        
+    # Check if trial time has passed
+    if user['trial_start']:
+        try:
+            start_date = datetime.strptime(user['trial_start'].split('.')[0], '%Y-%m-%d %H:%M:%S')
+        except:
+             # Fallback if format is different or isoformat
+            start_date = datetime.fromisoformat(user['trial_start'])
+            
+        elapsed = datetime.now() - start_date
+        if elapsed.days >= 14:
+            # Expire it
+            conn = get_db()
+            conn.execute("UPDATE users SET subscription_status = 'expired' WHERE id = ?", (user['id'],))
+            conn.commit()
+            conn.close()
+            return 'expired', 0
+        else:
+            return 'trial', 14 - elapsed.days
+            
+    return 'trial', 14
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -98,21 +157,56 @@ def signup():
                 conn.close()
                 return redirect(url_for('signup'))
             password_hash = generate_password_hash(password)
-            cursor.execute('INSERT INTO users (email, name, password_hash, username, role) VALUES (?, ?, ?, ?, ?)',
-                         (email, name, password_hash, email, 'user'))
+            verification_token = str(uuid.uuid4())
+            trial_start = datetime.now()
+            
+            cursor.execute('INSERT INTO users (email, name, password_hash, username, role, verification_token, trial_start, is_verified) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
+                         (email, name, password_hash, email, 'user', verification_token, trial_start))
             conn.commit()
             conn.close()
-            flash('Account created! Please log in.')
+            
+            # Send verification email
+            email_service.send_verification_email(email, verification_token)
+            
+            flash('Account created! Please check your email to verify your account.')
             return redirect(url_for('login'))
         except Exception as e:
             flash(f'An error occurred: {str(e)}')
             return redirect(url_for('signup'))
     return render_template('signup.html')
 
+@app.route('/verify-email/<token>')
+def verify_email(token):
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        user = cursor.execute('SELECT * FROM users WHERE verification_token = ?', (token,)).fetchone()
+        
+        if not user:
+            flash('Invalid verification link.')
+            return redirect(url_for('login'))
+            
+        cursor.execute('UPDATE users SET is_verified = 1, verification_token = NULL WHERE id = ?', (user['id'],))
+        conn.commit()
+        conn.close()
+        
+        flash('Email verified! You can now log in.')
+        return redirect(url_for('login'))
+    except Exception as e:
+        flash(f'Verification failed: {str(e)}')
+        return redirect(url_for('login'))
+
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+@app.route('/billing')
+@login_required
+def billing():
+    return render_template('billing.html', 
+                         stripe_key=config.STRIPE_PUBLIC_KEY, 
+                         price_id=config.STRIPE_PRICE_ID)
 
 @app.route('/api/queue/<int:entry_id>', methods=['PATCH'])
 def api_update_queue_entry(entry_id):

@@ -782,6 +782,39 @@
     </script>
 
     {% block extra_js %}{% endblock %}
+    <!-- Trial Started Modal -->
+    {% if trial and trial.status == 'trial' %}
+    <div id="trialModal" class="modal-overlay" style="display: none; z-index: 9999;">
+        <div class="modal" style="max-width: 500px; text-align: center;">
+            <div class="modal-header" style="justify-content: center; border: none; padding-bottom: 0;">
+                <h2 style="color: var(--color-primary); font-size: 2rem;">🎉 Welcome!</h2>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 1.2rem; margin: 20px 0;">Your <strong>14-Day Free Trial</strong> has started.</p>
+                <p class="text-muted">You have full access to all features. Your trial will expire in <strong
+                        id="trialDaysLeft">{{ trial.days_left }}</strong> days.</p>
+                <p style="font-size: 0.9rem; color: #666;">After the trial, you can subscribe for just $49/month.</p>
+            </div>
+            <div class="modal-footer" style="justify-content: center; border: none; padding-top: 0;">
+                <button class="btn btn-primary btn-lg" onclick="closeTrialModal()">Let's Get Started</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Show trial modal if not shown before in this session
+            if (!sessionStorage.getItem('trial_popup_shown')) {
+                document.getElementById('trialModal').style.display = 'flex';
+                sessionStorage.setItem('trial_popup_shown', 'true');
+            }
+        });
+
+        function closeTrialModal() {
+            document.getElementById('trialModal').style.display = 'none';
+        }
+    </script>
+    {% endif %}
+
 </body>
 
 </html>

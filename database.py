@@ -37,9 +37,15 @@ def init_db():
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL,
             office_id INTEGER,
+            is_verified BOOLEAN DEFAULT 0,
+            verification_token TEXT,
+            trial_start TIMESTAMP,
+            subscription_status TEXT DEFAULT 'trial',
+            stripe_customer_id TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (office_id) REFERENCES offices (id)
         )
+
     ''')
     
     # Patients table
